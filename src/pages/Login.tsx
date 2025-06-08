@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -15,33 +16,35 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, user } = useAuth();
+
+  // Redirect if already authenticated
+  if (user) {
+    navigate('/dashboard');
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Simulate login process
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await signIn(email, password);
       
-      // For demo purposes, accept any email/password
-      if (email && password) {
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', email);
-        
-        toast({
-          title: 'Login Successful!',
-          description: 'Welcome back to SMM Kings.',
-        });
-        
-        navigate('/dashboard');
-      } else {
-        throw new Error('Please fill in all fields');
+      if (error) {
+        throw error;
       }
-    } catch (error) {
+
+      toast({
+        title: 'Login Successful!',
+        description: 'Welcome back to SMM Kings.',
+      });
+      
+      navigate('/dashboard');
+    } catch (error: any) {
       toast({
         title: 'Login Failed',
-        description: error instanceof Error ? error.message : 'Please check your credentials and try again.',
+        description: error.message || 'Please check your credentials and try again.',
         variant: 'destructive',
       });
     } finally {

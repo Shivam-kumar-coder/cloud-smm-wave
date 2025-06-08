@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Signup = () => {
   const [name, setName] = useState('');
@@ -18,6 +19,13 @@ const Signup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp, user } = useAuth();
+
+  // Redirect if already authenticated
+  if (user) {
+    navigate('/dashboard');
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,23 +40,22 @@ const Signup = () => {
         throw new Error('Password must be at least 6 characters long');
       }
 
-      // Simulate signup process
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await signUp(email, password, name);
       
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userEmail', email);
-      localStorage.setItem('userName', name);
-      
+      if (error) {
+        throw error;
+      }
+
       toast({
         title: 'Account Created!',
-        description: 'Welcome to SMM Kings. Your account has been created successfully.',
+        description: 'Please check your email to verify your account.',
       });
       
-      navigate('/dashboard');
-    } catch (error) {
+      navigate('/login');
+    } catch (error: any) {
       toast({
         title: 'Signup Failed',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: error.message || 'Please try again.',
         variant: 'destructive',
       });
     } finally {

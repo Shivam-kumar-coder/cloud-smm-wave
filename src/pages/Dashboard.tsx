@@ -1,5 +1,4 @@
 
-import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -15,19 +14,21 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useProfile } from '@/hooks/useProfile';
+import { useOrders } from '@/hooks/useOrders';
 
 const Dashboard = () => {
-  const [userName, setUserName] = useState('');
+  const { data: profile } = useProfile();
+  const { data: orders = [] } = useOrders();
 
-  useEffect(() => {
-    const name = localStorage.getItem('userName') || 'User';
-    setUserName(name);
-  }, []);
+  const completedOrders = orders.filter(order => order.status === 'completed');
+  const activeOrders = orders.filter(order => ['pending', 'processing'].includes(order.status));
+  const totalSpent = orders.reduce((sum, order) => sum + Number(order.total_cost), 0);
 
   const stats = [
     {
       title: 'Wallet Balance',
-      value: '$125.50',
+      value: `$${(profile?.balance || 0).toFixed(2)}`,
       description: 'Available funds',
       icon: <Wallet className="w-4 h-4" />,
       color: 'text-green-500',
@@ -35,15 +36,15 @@ const Dashboard = () => {
     },
     {
       title: 'Total Orders',
-      value: '23',
-      description: 'Completed orders',
+      value: orders.length.toString(),
+      description: 'All time orders',
       icon: <ShoppingBag className="w-4 h-4" />,
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10'
     },
     {
       title: 'Active Orders',
-      value: '5',
+      value: activeOrders.length.toString(),
       description: 'In progress',
       icon: <Clock className="w-4 h-4" />,
       color: 'text-orange-500',
@@ -51,38 +52,11 @@ const Dashboard = () => {
     },
     {
       title: 'Total Spent',
-      value: '$1,234.50',
-      description: 'This month',
+      value: `$${totalSpent.toFixed(2)}`,
+      description: 'All time',
       icon: <DollarSign className="w-4 h-4" />,
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10'
-    }
-  ];
-
-  const recentOrders = [
-    {
-      id: '#12345',
-      service: 'Instagram Followers',
-      quantity: '1,000',
-      status: 'Completed',
-      progress: 100,
-      amount: '$12.50'
-    },
-    {
-      id: '#12346',
-      service: 'YouTube Views',
-      quantity: '5,000',
-      status: 'In Progress',
-      progress: 75,
-      amount: '$25.00'
-    },
-    {
-      id: '#12347',
-      service: 'TikTok Likes',
-      quantity: '2,500',
-      status: 'Processing',
-      progress: 25,
-      amount: '$15.75'
     }
   ];
 
@@ -116,7 +90,7 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {userName}! 👋</h1>
+            <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || 'User'}! 👋</h1>
             <p className="text-muted-foreground mt-2">
               Here's what's happening with your account today.
             </p>
@@ -182,27 +156,35 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentOrders.map((order, index) => (
-                <div key={index} className="flex items-center justify-between p-4 rounded-lg bg-accent/50">
+              {orders.slice(0, 3).map((order) => (
+                <div key={order.id} className="flex items-center justify-between p-4 rounded-lg bg-accent/50">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">{order.service}</h4>
-                      <span className="text-sm font-medium">{order.amount}</span>
+                      <h4 className="font-medium">{order.services?.name}</h4>
+                      <span className="text-sm font-medium">${Number(order.total_cost).toFixed(2)}</span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                      <span>Order {order.id}</span>
-                      <span>Quantity: {order.quantity}</span>
+                      <span>Quantity: {order.quantity.toLocaleString()}</span>
                       <span className={`font-medium ${
-                        order.status === 'Completed' ? 'text-green-500' : 
-                        order.status === 'In Progress' ? 'text-blue-500' : 'text-orange-500'
+                        order.status === 'completed' ? 'text-green-500' : 
+                        order.status === 'processing' ? 'text-blue-500' : 'text-orange-500'
                       }`}>
-                        {order.status}
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                       </span>
                     </div>
-                    <Progress value={order.progress} className="h-2" />
+                    <Progress 
+                      value={order.status === 'completed' ? 100 : order.status === 'processing' ? 75 : 25} 
+                      className="h-2" 
+                    />
                   </div>
                 </div>
               ))}
+
+              {orders.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No orders yet. Place your first order to get started!
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
