@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from "@/components/ui/use-toast";
 
 interface AuthContextType {
   user: User | null;
@@ -27,25 +28,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initial session check
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -54,35 +51,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: { full_name: fullName },
+        data: {
+          full_name: fullName,
+        },
       },
     });
 
-    if (error) {
-      console.error('Sign-up error:', error.message);
+    if (!error) {
+      toast({
+        title: "Sign up successful",
+        description: "Check your email to verify your account.",
+      });
     }
 
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (error) {
-      console.error('Sign-in error:', error.message);
+    if (!error) {
+      toast({
+        title: "Login successful",
+      });
     }
 
     return { error };
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Sign-out error:', error.message);
-    }
+    await supabase.auth.signOut();
   };
 
-  const value: AuthContextType = {
+  const value = {
     user,
     session,
     loading,
