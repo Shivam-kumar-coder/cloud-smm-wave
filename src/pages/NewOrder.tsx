@@ -1,14 +1,18 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { ShoppingCart, DollarSign, Clock, Star } from 'lucide-react';
+import { ShoppingCart, Clock, Star, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useServices } from '@/hooks/useServices';
+import { useCreateOrder } from '@/hooks/useOrders';
+import { useProfile } from '@/hooks/useProfile';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const NewOrder = () => {
   const [category, setCategory] = useState('');
@@ -17,69 +21,84 @@ const NewOrder = () => {
   const [quantity, setQuantity] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const categories = [
-    'Instagram',
-    'YouTube',
-    'TikTok',
-    'Facebook',
-    'Twitter',
-    'LinkedIn'
-  ];
+  const { data: services = [] } = useServices();
+  const createOrder = useCreateOrder();
+  const { data: profile } = useProfile();
 
-  const services = {
-    Instagram: [
-      { id: 'ig_followers', name: 'Instagram Followers', price: 0.015, min: 100, max: 10000, time: '0-6 hours' },
-      { id: 'ig_likes', name: 'Instagram Likes', price: 0.008, min: 100, max: 5000, time: '0-1 hour' },
-      { id: 'ig_comments', name: 'Instagram Comments', price: 0.05, min: 10, max: 1000, time: '0-12 hours' },
-      { id: 'ig_views', name: 'Instagram Views', price: 0.002, min: 1000, max: 100000, time: '0-6 hours' }
-    ],
-    YouTube: [
-      { id: 'yt_subscribers', name: 'YouTube Subscribers', price: 0.025, min: 100, max: 5000, time: '0-24 hours' },
-      { id: 'yt_views', name: 'YouTube Views', price: 0.003, min: 1000, max: 50000, time: '0-12 hours' },
-      { id: 'yt_likes', name: 'YouTube Likes', price: 0.01, min: 100, max: 2000, time: '0-6 hours' },
-      { id: 'yt_comments', name: 'YouTube Comments', price: 0.08, min: 10, max: 500, time: '0-24 hours' }
-    ],
-    TikTok: [
-      { id: 'tt_followers', name: 'TikTok Followers', price: 0.02, min: 100, max: 10000, time: '0-12 hours' },
-      { id: 'tt_likes', name: 'TikTok Likes', price: 0.006, min: 100, max: 10000, time: '0-6 hours' },
-      { id: 'tt_views', name: 'TikTok Views', price: 0.001, min: 1000, max: 100000, time: '0-6 hours' },
-      { id: 'tt_shares', name: 'TikTok Shares', price: 0.012, min: 50, max: 2000, time: '0-12 hours' }
-    ],
-    Facebook: [
-      { id: 'fb_likes', name: 'Facebook Page Likes', price: 0.018, min: 100, max: 5000, time: '0-24 hours' },
-      { id: 'fb_post_likes', name: 'Facebook Post Likes', price: 0.01, min: 100, max: 3000, time: '0-6 hours' },
-      { id: 'fb_comments', name: 'Facebook Comments', price: 0.06, min: 10, max: 500, time: '0-24 hours' },
-      { id: 'fb_shares', name: 'Facebook Shares', price: 0.015, min: 50, max: 1000, time: '0-12 hours' }
-    ],
-    Twitter: [
-      { id: 'tw_followers', name: 'Twitter Followers', price: 0.022, min: 100, max: 5000, time: '0-24 hours' },
-      { id: 'tw_likes', name: 'Twitter Likes', price: 0.009, min: 100, max: 3000, time: '0-6 hours' },
-      { id: 'tw_retweets', name: 'Twitter Retweets', price: 0.015, min: 50, max: 1000, time: '0-12 hours' },
-      { id: 'tw_comments', name: 'Twitter Comments', price: 0.07, min: 10, max: 300, time: '0-24 hours' }
-    ],
-    LinkedIn: [
-      { id: 'li_followers', name: 'LinkedIn Followers', price: 0.035, min: 100, max: 2000, time: '0-48 hours' },
-      { id: 'li_likes', name: 'LinkedIn Post Likes', price: 0.02, min: 50, max: 1000, time: '0-12 hours' },
-      { id: 'li_comments', name: 'LinkedIn Comments', price: 0.12, min: 10, max: 200, time: '0-48 hours' },
-      { id: 'li_shares', name: 'LinkedIn Shares', price: 0.025, min: 25, max: 500, time: '0-24 hours' }
-    ]
-  };
+  const categories = [...new Set(services.map(s => s.category))];
+  const filteredServices = services.filter(s => s.category === category);
+  const selectedService = filteredServices.find(s => s.id === service);
+  
+  const totalPrice = selectedService && quantity 
+    ? (selectedService.price_per_1000 * parseInt(quantity) / 1000).toFixed(2) 
+    : '0.00';
 
-  const selectedService = services[category as keyof typeof services]?.find(s => s.id === service);
-  const totalPrice = selectedService && quantity ? (selectedService.price * parseInt(quantity)).toFixed(2) : '0.00';
+  const userBalance = profile?.balance || 0;
+  const hasInsufficientFunds = parseFloat(totalPrice) > userBalance;
+
+  useEffect(() => {
+    if (category && !filteredServices.find(s => s.id === service)) {
+      setService('');
+    }
+  }, [category, filteredServices, service]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!selectedService) {
+      toast({
+        title: 'Error',
+        description: 'Please select a service',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const orderAmount = parseFloat(totalPrice);
+
+    if (orderAmount > userBalance) {
+      toast({
+        title: 'Insufficient Balance',
+        description: `You need ₹${orderAmount.toFixed(2)} but only have ₹${userBalance.toFixed(2)}. Please add funds to your wallet.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Simulate order placement
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      // Create order
+      await createOrder.mutateAsync({
+        service_id: selectedService.id,
+        link,
+        quantity: parseInt(quantity),
+        total_cost: orderAmount,
+      });
+
+      // Deduct from wallet balance
+      const newBalance = userBalance - orderAmount;
+      await supabase
+        .from('profiles')
+        .update({ balance: newBalance })
+        .eq('id', user?.id);
+
+      // Create transaction record
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user?.id,
+          type: 'order',
+          amount: orderAmount,
+          description: `Order for ${selectedService.name}`,
+          status: 'completed'
+        });
+
       toast({
         title: 'Order Placed Successfully!',
-        description: `Your order for ${selectedService?.name} has been placed and will be processed shortly.`,
+        description: `Your order for ${selectedService.name} has been placed. ₹${orderAmount.toFixed(2)} deducted from wallet.`,
       });
       
       // Reset form
@@ -87,10 +106,10 @@ const NewOrder = () => {
       setService('');
       setLink('');
       setQuantity('');
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Order Failed',
-        description: 'Failed to place order. Please try again.',
+        description: error.message || 'Failed to place order. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -140,9 +159,9 @@ const NewOrder = () => {
                           <SelectValue placeholder="Select a service" />
                         </SelectTrigger>
                         <SelectContent>
-                          {services[category as keyof typeof services]?.map((serv) => (
+                          {filteredServices.map((serv) => (
                             <SelectItem key={serv.id} value={serv.id}>
-                              {serv.name} - ${serv.price}/unit
+                              {serv.name} - ₹{serv.price_per_1000}/1k
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -165,14 +184,14 @@ const NewOrder = () => {
                   {selectedService && (
                     <div className="space-y-2">
                       <Label htmlFor="quantity">
-                        Quantity (Min: {selectedService.min}, Max: {selectedService.max})
+                        Quantity (Min: {selectedService.min_quantity}, Max: {selectedService.max_quantity})
                       </Label>
                       <Input
                         id="quantity"
                         type="number"
-                        min={selectedService.min}
-                        max={selectedService.max}
-                        placeholder={`Enter quantity (${selectedService.min}-${selectedService.max})`}
+                        min={selectedService.min_quantity}
+                        max={selectedService.max_quantity}
+                        placeholder={`Enter quantity (${selectedService.min_quantity}-${selectedService.max_quantity})`}
                         value={quantity}
                         onChange={(e) => setQuantity(e.target.value)}
                         required
@@ -180,17 +199,26 @@ const NewOrder = () => {
                     </div>
                   )}
 
+                  {hasInsufficientFunds && parseFloat(totalPrice) > 0 && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-red-800 text-sm">
+                        Insufficient balance! You need ₹{totalPrice} but have ₹{userBalance.toFixed(2)}. 
+                        Please add funds to your wallet.
+                      </p>
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full gradient-primary hover:scale-105 transition-transform duration-200"
-                    disabled={!selectedService || !link || !quantity || isLoading}
+                    disabled={!selectedService || !link || !quantity || isLoading || hasInsufficientFunds}
                   >
                     {isLoading ? (
                       'Placing Order...'
                     ) : (
                       <>
                         <ShoppingCart className="w-4 h-4 mr-2" />
-                        Place Order - ${totalPrice}
+                        Place Order - ₹{totalPrice}
                       </>
                     )}
                   </Button>
@@ -199,8 +227,23 @@ const NewOrder = () => {
             </Card>
           </div>
 
-          {/* Order Summary */}
+          {/* Order Summary & Wallet Info */}
           <div className="space-y-6">
+            {/* Wallet Balance */}
+            <Card className="glass-card border-0">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5" />
+                  Wallet Balance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-primary">₹{userBalance.toFixed(2)}</div>
+                <p className="text-sm text-muted-foreground">Available for orders</p>
+              </CardContent>
+            </Card>
+
+            {/* Order Summary */}
             <Card className="glass-card border-0">
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
@@ -213,8 +256,8 @@ const NewOrder = () => {
                       <span className="font-medium">{selectedService.name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Price per unit:</span>
-                      <span className="font-medium">${selectedService.price}</span>
+                      <span className="text-muted-foreground">Price per 1000:</span>
+                      <span className="font-medium">₹{selectedService.price_per_1000}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Quantity:</span>
@@ -224,13 +267,15 @@ const NewOrder = () => {
                       <span className="text-muted-foreground">Delivery time:</span>
                       <span className="font-medium flex items-center gap-1">
                         <Clock className="w-4 h-4" />
-                        {selectedService.time}
+                        0-24 hours
                       </span>
                     </div>
                     <div className="border-t pt-4">
                       <div className="flex justify-between text-lg font-bold">
                         <span>Total:</span>
-                        <span className="text-primary">${totalPrice}</span>
+                        <span className={hasInsufficientFunds ? 'text-red-500' : 'text-primary'}>
+                          ₹{totalPrice}
+                        </span>
                       </div>
                     </div>
                   </>
@@ -242,6 +287,7 @@ const NewOrder = () => {
               </CardContent>
             </Card>
 
+            {/* Why Choose Us */}
             <Card className="glass-card border-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

@@ -11,8 +11,10 @@ import {
   LogOut, 
   Menu, 
   X,
-  Home
+  Home,
+  Settings
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -20,19 +22,12 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [userName, setUserName] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
-  useEffect(() => {
-    const name = localStorage.getItem('userName') || 'User';
-    setUserName(name);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('userName');
+  const handleLogout = async () => {
+    await signOut();
     navigate('/');
   };
 
@@ -42,6 +37,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { icon: <ShoppingBag className="w-5 h-5" />, label: 'My Orders', path: '/dashboard/orders' },
     { icon: <Wallet className="w-5 h-5" />, label: 'Wallet', path: '/dashboard/wallet' },
     { icon: <MessageSquare className="w-5 h-5" />, label: 'Support', path: '/dashboard/support' },
+    { icon: <Settings className="w-5 h-5" />, label: 'Admin', path: '/dashboard/admin' },
   ];
 
   const isActive = (path: string) => {
@@ -109,7 +105,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 <User className="w-4 h-4 text-white" />
               </div>
               <div>
-                <p className="text-sm font-medium">{userName}</p>
+                <p className="text-sm font-medium">{user?.email}</p>
                 <p className="text-xs text-muted-foreground">Premium User</p>
               </div>
             </div>
