@@ -1,91 +1,89 @@
-import React, { useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+"use client"
 
-const Signup: React.FC = () => {
-  const { signUp } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/utils/supabase/client"
+import { toast } from "@/components/ui/use-toast"
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const { error } = await signUp(email, password, fullName);
+export default function Signup() {
+  const supabase = createClient()
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
 
     if (error) {
-      setMessage({ type: "error", text: error.message });
-    } else {
-      setMessage({ type: "success", text: "Check your email for confirmation verification." });
-      setEmail("");
-      setPassword("");
-      setFullName("");
+      toast({
+        title: "Signup Failed",
+        description: error.message,
+        variant: "destructive",
+        duration: 15000,
+      })
+    } else if (data.user && !data.user.confirmed_at) {
+      toast({
+        title: "Email Confirmation Required",
+        description: "Check your email to confirm your account.",
+        variant: "destructive", // 🔴 red dark border
+        duration: 15000, // 🕒 15 seconds
+      })
     }
 
-    // Message hatane ka timeout (10 seconds)
-    setTimeout(() => {
-      setMessage(null);
-    }, 10000);
-  };
+    setLoading(false)
+  }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-100">
-      <div className="w-full max-w-md bg-white p-6 rounded-lg shadow-lg">
-        <h1 className="text-2xl font-bold mb-6 text-center">Sign Up</h1>
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <form
+        onSubmit={handleSignUp}
+        className="w-full max-w-md space-y-6 bg-white shadow-lg p-8 rounded-xl border"
+      >
+        <h2 className="text-2xl font-bold text-center">Sign Up</h2>
 
-        {message && (
-          <div
-            className={`mb-4 px-4 py-3 rounded border ${
-              message.type === "success" ? "border-green-500 bg-green-100 text-green-700" : "border-red-500 bg-red-100 text-red-700"
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
+        <div className="space-y-2">
+          <label htmlFor="email" className="block text-sm font-medium">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Full Name</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
+        <div className="space-y-2">
+          <label htmlFor="password" className="block text-sm font-medium">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition"
-          >
-            Sign Up
-          </button>
-        </form>
-      </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded"
+        >
+          {loading ? "Signing Up..." : "Sign Up"}
+        </button>
+      </form>
     </div>
-  );
-};
-
-export default Signup;
+  )
+}
