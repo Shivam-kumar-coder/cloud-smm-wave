@@ -15,6 +15,8 @@ import Orders from "./pages/Orders";
 import Wallet from "./pages/Wallet";
 import Support from "./pages/Support";
 import Admin from "./pages/Admin";
+import RefundPolicy from "./pages/RefundPolicy";
+import CustomerSupport from "./pages/CustomerSupport";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -33,6 +35,8 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/support" element={<CustomerSupport />} />
             
             {/* Protected Dashboard Routes */}
             <Route path="/dashboard" element={

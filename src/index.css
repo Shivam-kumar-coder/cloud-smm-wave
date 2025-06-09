@@ -3,92 +3,53 @@
 @tailwind components;
 @tailwind utilities;
 
-/* SMM Kings Design System */
+/* SMM Kings Light Design System */
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 263 85% 60%;
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 263 85% 60%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 240 10% 3.9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 263 85% 60%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 263 85% 60%;
-
-    /* Custom gradients for SMM Panel */
-    --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
-    --gradient-secondary: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
-    --gradient-accent: linear-gradient(135deg, #f59e0b 0%, #ec4899 100%);
-  }
-
-  .light {
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 222.2 84% 4.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 263 85% 60%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 263 85% 60%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 263 85% 60%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-primary: 221.2 83.2% 53.3%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222.2 84% 4.9%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 221.2 83.2% 53.3%;
+
+    /* Custom gradients for SMM Panel */
+    --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    --gradient-secondary: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    --gradient-accent: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
   }
 }
 
@@ -98,8 +59,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
-    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e  100%);
+    @apply bg-gray-50 text-foreground;
     min-height: 100vh;
   }
 }
@@ -118,7 +78,11 @@
   }
 
   .glass-card {
-    @apply backdrop-blur-xl bg-card/50 border border-border/50;
+    @apply bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-lg;
+  }
+
+  .light-card {
+    @apply bg-white border border-gray-200 shadow-sm rounded-xl;
   }
 
   .animate-float {
@@ -135,15 +99,15 @@
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-20px);
+    transform: translateY(-10px);
   }
 }
 
 @keyframes glow {
   from {
-    box-shadow: 0 0 20px #8b5cf6;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
   }
   to {
-    box-shadow: 0 0 30px #8b5cf6, 0 0 40px #8b5cf6;
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
   }
 }

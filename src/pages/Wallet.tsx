@@ -57,36 +57,35 @@ const Wallet = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-8 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Wallet</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Wallet</h1>
+            <p className="text-gray-600">
               Manage your funds and view transaction history.
             </p>
           </div>
         </div>
 
         {/* Balance Card */}
-        <Card className="glass-card border-0 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-cyan-500/10" />
-          <CardContent className="p-8 relative">
+        <Card className="light-card border-2 border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50">
+          <CardContent className="p-8">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground mb-2">Current Balance</p>
-                <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                <p className="text-gray-600 mb-2">Current Balance</p>
+                <h2 className="text-4xl font-bold text-blue-600">
                   ₹{balance.toFixed(2)}
                 </h2>
-                <p className="text-sm text-muted-foreground mt-2">Available for orders</p>
+                <p className="text-sm text-gray-500 mt-2">Available for orders</p>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-2xl flex items-center justify-center">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
                 <WalletIcon className="w-8 h-8 text-white" />
               </div>
             </div>
             <div className="mt-6">
               <Dialog open={isAddFundsOpen} onOpenChange={setIsAddFundsOpen}>
                 <DialogTrigger asChild>
-                  <Button className="gradient-primary hover:scale-105 transition-transform duration-200">
+                  <Button className="gradient-primary hover:opacity-90 transition-all duration-200 rounded-xl">
                     <CreditCard className="w-4 h-4 mr-2" />
                     Add Funds
                   </Button>
@@ -95,7 +94,7 @@ const Wallet = () => {
                   <DialogHeader>
                     <DialogTitle>Add Funds via Razorpay</DialogTitle>
                     <DialogDescription>
-                      Add money to your wallet using Razorpay payment gateway.
+                      Add money to your wallet using Razorpay payment gateway. Minimum amount: ₹10
                     </DialogDescription>
                   </DialogHeader>
                   <RazorpayPayment onSuccess={() => setIsAddFundsOpen(false)} />
@@ -107,37 +106,37 @@ const Wallet = () => {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="glass-card border-0">
+          <Card className="light-card">
             <CardContent className="p-6 text-center">
               <DollarSign className="w-8 h-8 mx-auto mb-2 text-green-500" />
               <div className="text-2xl font-bold text-green-500">
                 +₹{transactions.filter(t => t.type === 'deposit' || t.type === 'refund').reduce((sum, t) => sum + Number(t.amount), 0).toFixed(2)}
               </div>
-              <div className="text-sm text-muted-foreground">Total Added</div>
+              <div className="text-sm text-gray-600">Total Added</div>
             </CardContent>
           </Card>
-          <Card className="glass-card border-0">
+          <Card className="light-card">
             <CardContent className="p-6 text-center">
               <DollarSign className="w-8 h-8 mx-auto mb-2 text-red-500" />
               <div className="text-2xl font-bold text-red-500">
                 ₹{transactions.filter(t => t.type === 'order' || t.type === 'withdrawal').reduce((sum, t) => sum + Number(t.amount), 0).toFixed(2)}
               </div>
-              <div className="text-sm text-muted-foreground">Total Spent</div>
+              <div className="text-sm text-gray-600">Total Spent</div>
             </CardContent>
           </Card>
-          <Card className="glass-card border-0">
+          <Card className="light-card">
             <CardContent className="p-6 text-center">
               <WalletIcon className="w-8 h-8 mx-auto mb-2 text-blue-500" />
               <div className="text-2xl font-bold text-blue-500">{transactions.length}</div>
-              <div className="text-sm text-muted-foreground">Transactions</div>
+              <div className="text-sm text-gray-600">Transactions</div>
             </CardContent>
           </Card>
         </div>
 
         {/* Transaction History */}
-        <Card className="glass-card border-0">
+        <Card className="light-card">
           <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
+            <CardTitle className="text-gray-900">Recent Transactions</CardTitle>
             <CardDescription>Your recent wallet transactions</CardDescription>
           </CardHeader>
           <CardContent>
@@ -146,17 +145,17 @@ const Wallet = () => {
                 transactions.map((transaction) => (
                   <div
                     key={transaction.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-accent/50 hover:bg-accent/70 transition-colors"
+                    className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="p-2 rounded-lg bg-background">
+                      <div className="p-2 rounded-lg bg-white border border-gray-200">
                         {getTransactionIcon(transaction.type)}
                       </div>
                       <div>
-                        <h4 className="font-medium">{transaction.description || `${transaction.type} transaction`}</h4>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <h4 className="font-medium text-gray-900">{transaction.description || `${transaction.type} transaction`}</h4>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
                           <span>{new Date(transaction.created_at).toLocaleDateString()}</span>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs rounded-full">
                             {transaction.status}
                           </Badge>
                         </div>
@@ -166,12 +165,12 @@ const Wallet = () => {
                       <div className={`text-lg font-bold ${getTransactionColor(transaction.type)}`}>
                         {getTransactionSign(transaction.type)}₹{Number(transaction.amount).toFixed(2)}
                       </div>
-                      <div className="text-xs text-muted-foreground">#{transaction.id.slice(0, 8)}</div>
+                      <div className="text-xs text-gray-500">#{transaction.id.slice(0, 8)}</div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-gray-500">
                   <WalletIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No transactions yet</p>
                   <p className="text-sm">Add funds to get started</p>

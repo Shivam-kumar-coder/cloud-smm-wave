@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShoppingCart, Clock, Star, Wallet } from 'lucide-react';
+import { ShoppingCart, Clock, Star, Wallet, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useServices } from '@/hooks/useServices';
@@ -60,7 +60,7 @@ const NewOrder = () => {
 
     if (orderAmount > userBalance) {
       toast({
-        title: 'Insufficient Balance',
+        title: 'Insufficient Wallet Balance',
         description: `You need ₹${orderAmount.toFixed(2)} but only have ₹${userBalance.toFixed(2)}. Please add funds to your wallet.`,
         variant: 'destructive',
       });
@@ -71,7 +71,7 @@ const NewOrder = () => {
 
     try {
       // Create order
-      await createOrder.mutateAsync({
+      const orderData = await createOrder.mutateAsync({
         service_id: selectedService.id,
         link,
         quantity: parseInt(quantity),
@@ -96,6 +96,25 @@ const NewOrder = () => {
           status: 'completed'
         });
 
+      // Send admin notification email
+      try {
+        await supabase.functions.invoke('send-order-notification', {
+          body: {
+            order: {
+              id: orderData.id,
+              user_email: user?.email,
+              service_name: selectedService.name,
+              quantity: parseInt(quantity),
+              amount: orderAmount,
+              link,
+            }
+          }
+        });
+      } catch (emailError) {
+        console.log('Email notification failed:', emailError);
+        // Don't block the order if email fails
+      }
+
       toast({
         title: 'Order Placed Successfully!',
         description: `Your order for ${selectedService.name} has been placed. ₹${orderAmount.toFixed(2)} deducted from wallet.`,
@@ -119,10 +138,10 @@ const NewOrder = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-8 p-6">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Place New Order</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Place New Order</h1>
+          <p className="text-gray-600">
             Choose from our wide range of social media marketing services to boost your online presence.
           </p>
         </div>
@@ -130,9 +149,9 @@ const NewOrder = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Order Form */}
           <div className="lg:col-span-2">
-            <Card className="glass-card border-0">
+            <Card className="light-card">
               <CardHeader>
-                <CardTitle>Order Details</CardTitle>
+                <CardTitle className="text-gray-900">Order Details</CardTitle>
                 <CardDescription>Fill in the details below to place your order</CardDescription>
               </CardHeader>
               <CardContent>
@@ -140,7 +159,7 @@ const NewOrder = () => {
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>
                     <Select value={category} onValueChange={setCategory}>
-                      <SelectTrigger>
+                      <SelectTrigger className="rounded-xl">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -155,7 +174,7 @@ const NewOrder = () => {
                     <div className="space-y-2">
                       <Label htmlFor="service">Service</Label>
                       <Select value={service} onValueChange={setService}>
-                        <SelectTrigger>
+                        <SelectTrigger className="rounded-xl">
                           <SelectValue placeholder="Select a service" />
                         </SelectTrigger>
                         <SelectContent>
@@ -178,6 +197,7 @@ const NewOrder = () => {
                       value={link}
                       onChange={(e) => setLink(e.target.value)}
                       required
+                      className="rounded-xl"
                     />
                   </div>
 
@@ -195,26 +215,33 @@ const NewOrder = () => {
                         value={quantity}
                         onChange={(e) => setQuantity(e.target.value)}
                         required
+                        className="rounded-xl"
                       />
                     </div>
                   )}
 
                   {hasInsufficientFunds && parseFloat(totalPrice) > 0 && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-red-800 text-sm">
-                        Insufficient balance! You need ₹{totalPrice} but have ₹{userBalance.toFixed(2)}. 
-                        Please add funds to your wallet.
-                      </p>
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                      <div className="flex items-center">
+                        <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+                        <p className="text-red-800 text-sm">
+                          Insufficient wallet balance! You need ₹{totalPrice} but have ₹{userBalance.toFixed(2)}. 
+                          Please add funds to your wallet.
+                        </p>
+                      </div>
                     </div>
                   )}
 
                   <Button
                     type="submit"
-                    className="w-full gradient-primary hover:scale-105 transition-transform duration-200"
+                    className="w-full gradient-primary hover:opacity-90 transition-all duration-200 rounded-xl py-3"
                     disabled={!selectedService || !link || !quantity || isLoading || hasInsufficientFunds}
                   >
                     {isLoading ? (
-                      'Placing Order...'
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Placing Order...
+                      </div>
                     ) : (
                       <>
                         <ShoppingCart className="w-4 h-4 mr-2" />
@@ -230,57 +257,57 @@ const NewOrder = () => {
           {/* Order Summary & Wallet Info */}
           <div className="space-y-6">
             {/* Wallet Balance */}
-            <Card className="glass-card border-0">
+            <Card className="light-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Wallet className="w-5 h-5" />
+                <CardTitle className="flex items-center gap-2 text-gray-900">
+                  <Wallet className="w-5 h-5 text-blue-600" />
                   Wallet Balance
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-primary">₹{userBalance.toFixed(2)}</div>
-                <p className="text-sm text-muted-foreground">Available for orders</p>
+                <div className="text-3xl font-bold text-blue-600">₹{userBalance.toFixed(2)}</div>
+                <p className="text-sm text-gray-600 mt-1">Available for orders</p>
               </CardContent>
             </Card>
 
             {/* Order Summary */}
-            <Card className="glass-card border-0">
+            <Card className="light-card">
               <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
+                <CardTitle className="text-gray-900">Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {selectedService ? (
                   <>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Service:</span>
-                      <span className="font-medium">{selectedService.name}</span>
+                      <span className="text-gray-600">Service:</span>
+                      <span className="font-medium text-gray-900">{selectedService.name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Price per 1000:</span>
-                      <span className="font-medium">₹{selectedService.price_per_1000}</span>
+                      <span className="text-gray-600">Price per 1000:</span>
+                      <span className="font-medium text-gray-900">₹{selectedService.price_per_1000}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Quantity:</span>
-                      <span className="font-medium">{quantity || 0}</span>
+                      <span className="text-gray-600">Quantity:</span>
+                      <span className="font-medium text-gray-900">{quantity || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Delivery time:</span>
-                      <span className="font-medium flex items-center gap-1">
+                      <span className="text-gray-600">Delivery time:</span>
+                      <span className="font-medium flex items-center gap-1 text-gray-900">
                         <Clock className="w-4 h-4" />
                         0-24 hours
                       </span>
                     </div>
                     <div className="border-t pt-4">
                       <div className="flex justify-between text-lg font-bold">
-                        <span>Total:</span>
-                        <span className={hasInsufficientFunds ? 'text-red-500' : 'text-primary'}>
+                        <span className="text-gray-900">Total:</span>
+                        <span className={hasInsufficientFunds ? 'text-red-500' : 'text-blue-600'}>
                           ₹{totalPrice}
                         </span>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <p className="text-muted-foreground text-center py-8">
+                  <p className="text-gray-500 text-center py-8">
                     Select a service to see the summary
                   </p>
                 )}
@@ -288,33 +315,33 @@ const NewOrder = () => {
             </Card>
 
             {/* Why Choose Us */}
-            <Card className="glass-card border-0">
+            <Card className="light-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-gray-900">
                   <Star className="w-5 h-5 text-yellow-500" />
                   Why Choose Us?
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
                   <div>
-                    <p className="font-medium">High Quality</p>
-                    <p className="text-sm text-muted-foreground">Real, active users with high retention rates</p>
+                    <p className="font-medium text-gray-900">High Quality</p>
+                    <p className="text-sm text-gray-600">Real, active users with high retention rates</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
                   <div>
-                    <p className="font-medium">Fast Delivery</p>
-                    <p className="text-sm text-muted-foreground">Most orders start within minutes</p>
+                    <p className="font-medium text-gray-900">Fast Delivery</p>
+                    <p className="text-sm text-gray-600">Most orders start within minutes</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
                   <div>
-                    <p className="font-medium">24/7 Support</p>
-                    <p className="text-sm text-muted-foreground">Always here to help you succeed</p>
+                    <p className="font-medium text-gray-900">24/7 Support</p>
+                    <p className="text-sm text-gray-600">Always here to help you succeed</p>
                   </div>
                 </div>
               </CardContent>
