@@ -2,16 +2,16 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/utils/supabase/client"
+import { useNavigate } from "react-router-dom"
+import { supabase } from "@/integrations/supabase/client"
 import { toast } from "@/components/ui/use-toast"
 
 export default function Signup() {
-  const supabase = createClient()
-  const router = useRouter()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [fullName, setFullName] = useState("")
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,6 +20,12 @@ export default function Signup() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        data: {
+          full_name: fullName,
+        },
+      },
     })
 
     if (error) {
@@ -50,6 +56,21 @@ export default function Signup() {
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h2>
           <p className="text-gray-600">Join SMM Kings today</p>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+            Full Name
+          </label>
+          <input
+            id="fullName"
+            type="text"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="Your full name"
+          />
         </div>
 
         <div className="space-y-2">

@@ -17,7 +17,11 @@ export const useUserRole = () => {
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user role:', error);
+        return 'user'; // Default to user role on error
+      }
+      
       return data?.role || 'user';
     },
     enabled: !!user,
