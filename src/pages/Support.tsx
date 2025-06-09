@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,51 +10,30 @@ import { Badge } from '@/components/ui/badge';
 import { MessageSquare, Plus, Clock, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useSupportTickets, useCreateSupportTicket, useCreateSupportReply } from '@/hooks/useSupportTickets';
+import { format } from 'date-fns';
 
 const Support = () => {
   const [subject, setSubject] = useState('');
-  const [priority, setPriority] = useState('');
+  const [priority, setPriority] = useState('medium');
   const [message, setMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [replyingToTicket, setReplyingToTicket] = useState<string | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
   const { toast } = useToast();
-
-  const tickets = [
-    {
-      id: '#TICK001',
-      subject: 'Order not starting',
-      priority: 'High',
-      status: 'Open',
-      createdAt: '2024-01-17 14:30',
-      lastReply: '2024-01-17 15:45',
-      messages: 3
-    },
-    {
-      id: '#TICK002',
-      subject: 'Payment issue',
-      priority: 'Medium',
-      status: 'In Progress',
-      createdAt: '2024-01-16 09:15',
-      lastReply: '2024-01-16 16:20',
-      messages: 5
-    },
-    {
-      id: '#TICK003',
-      subject: 'Account verification',
-      priority: 'Low',
-      status: 'Resolved',
-      createdAt: '2024-01-15 11:20',
-      lastReply: '2024-01-15 18:30',
-      messages: 2
-    }
-  ];
+  
+  const { data: tickets = [], isLoading } = useSupportTickets();
+  const createTicket = useCreateSupportTicket();
+  const createReply = useCreateSupportReply();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
     try {
-      // Simulate ticket creation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await createTicket.mutateAsync({
+        subject,
+        message,
+        priority,
+      });
       
       toast({
         title: 'Ticket Created Successfully!',
@@ -62,26 +42,49 @@ const Support = () => {
       
       // Reset form
       setSubject('');
-      setPriority('');
       setMessage('');
-    } catch (error) {
+      setPriority('medium');
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to create ticket. Please try again.',
+        description: error.message || 'Failed to create ticket.',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  const handleSendReply = async (ticketId: string) => {
+    if (!replyMessage.trim()) return;
+
+    try {
+      await createReply.mutateAsync({
+        ticket_id: ticketId,
+        message: replyMessage,
+      });
+      
+      setReplyMessage('');
+      setReplyingToTicket(null);
+      
+      toast({
+        title: 'Reply Sent',
+        description: 'Your reply has been sent.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send reply.',
+        variant: 'destructive',
+      });
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Open':
+      case 'open':
         return <AlertCircle className="w-4 h-4" />;
-      case 'In Progress':
+      case 'in_progress':
         return <Clock className="w-4 h-4" />;
-      case 'Resolved':
+      case 'closed':
         return <CheckCircle className="w-4 h-4" />;
       default:
         return <HelpCircle className="w-4 h-4" />;
@@ -90,11 +93,11 @@ const Support = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Open':
+      case 'open':
         return 'bg-red-500/10 text-red-500 border-red-500/20';
-      case 'In Progress':
+      case 'in_progress':
         return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      case 'Resolved':
+      case 'closed':
         return 'bg-green-500/10 text-green-500 border-green-500/20';
       default:
         return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
@@ -103,16 +106,26 @@ const Support = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'High':
+      case 'high':
         return 'bg-red-500/10 text-red-500 border-red-500/20';
-      case 'Medium':
+      case 'medium':
         return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
-      case 'Low':
+      case 'low':
         return 'bg-green-500/10 text-green-500 border-green-500/20';
       default:
         return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
     }
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -178,9 +191,9 @@ const Support = () => {
                 <Button
                   type="submit"
                   className="w-full gradient-primary hover:scale-105 transition-transform duration-200"
-                  disabled={!subject || !priority || !message || isLoading}
+                  disabled={!subject || !message || createTicket.isPending}
                 >
-                  {isLoading ? (
+                  {createTicket.isPending ? (
                     'Creating Ticket...'
                   ) : (
                     <>
@@ -237,36 +250,73 @@ const Support = () => {
           <CardContent>
             <div className="space-y-4">
               {tickets.map((ticket) => (
-                <div
-                  key={ticket.id}
-                  className="flex items-center justify-between p-4 rounded-lg bg-accent/50 hover:bg-accent/70 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-lg bg-background">
-                      {getStatusIcon(ticket.status)}
-                    </div>
+                <div key={ticket.id} className="p-4 rounded-lg bg-accent/50">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
                       <h4 className="font-medium">{ticket.subject}</h4>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>Ticket {ticket.id}</span>
-                        <span>•</span>
-                        <span>{ticket.messages} messages</span>
-                        <span>•</span>
-                        <span>Last reply: {ticket.lastReply}</span>
-                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Created: {format(new Date(ticket.created_at), 'MMM dd, yyyy HH:mm')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
+                        {ticket.priority}
+                      </Badge>
+                      <Badge variant="outline" className={getStatusColor(ticket.status)}>
+                        {ticket.status?.replace('_', ' ')}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
-                      {ticket.priority}
-                    </Badge>
-                    <Badge variant="outline" className={getStatusColor(ticket.status)}>
-                      {ticket.status}
-                    </Badge>
-                    <Button variant="outline" size="sm">
-                      View
-                    </Button>
+
+                  <div className="bg-white p-3 rounded-lg mb-4">
+                    <p className="text-gray-700">{ticket.message}</p>
                   </div>
+
+                  {ticket.support_replies && ticket.support_replies.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      <h4 className="font-medium text-sm">Conversation:</h4>
+                      {ticket.support_replies.map((reply: any) => (
+                        <div key={reply.id} className={`p-3 rounded-lg ${reply.is_admin ? 'bg-blue-50 ml-4' : 'bg-gray-100 mr-4'}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-medium">
+                              {reply.is_admin ? 'Support Team' : 'You'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {format(new Date(reply.created_at), 'MMM dd, HH:mm')}
+                            </span>
+                          </div>
+                          <p className="text-sm">{reply.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {ticket.status !== 'closed' && (
+                    <>
+                      {replyingToTicket === ticket.id ? (
+                        <div className="space-y-3">
+                          <Textarea
+                            placeholder="Type your reply..."
+                            value={replyMessage}
+                            onChange={(e) => setReplyMessage(e.target.value)}
+                            rows={3}
+                          />
+                          <div className="flex gap-2">
+                            <Button onClick={() => handleSendReply(ticket.id)} size="sm" disabled={createReply.isPending}>
+                              {createReply.isPending ? 'Sending...' : 'Send Reply'}
+                            </Button>
+                            <Button variant="outline" onClick={() => setReplyingToTicket(null)} size="sm">
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button onClick={() => setReplyingToTicket(ticket.id)} size="sm" variant="outline">
+                          Reply
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </div>
               ))}
 

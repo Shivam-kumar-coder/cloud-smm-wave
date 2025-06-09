@@ -10,14 +10,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface OrderNotificationRequest {
-  orderId: string;
-  userName: string;
+interface TicketNotificationRequest {
+  ticketId: string;
   userEmail: string;
-  serviceName: string;
-  quantity: number;
-  totalCost: number;
-  link: string;
+  subject: string;
+  message: string;
+  priority: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -27,47 +25,46 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const { 
-      orderId, 
-      userName, 
+      ticketId, 
       userEmail, 
-      serviceName, 
-      quantity, 
-      totalCost,
-      link 
-    }: OrderNotificationRequest = await req.json();
+      subject, 
+      message, 
+      priority 
+    }: TicketNotificationRequest = await req.json();
+
+    const priorityColor = priority === 'high' ? '#dc2626' : priority === 'medium' ? '#f59e0b' : '#16a34a';
 
     const emailResponse = await resend.emails.send({
-      from: "SMM Kings <orders@smmkings.com>",
+      from: "SMM Kings <support@smmkings.com>",
       to: ["admin@smmkings.com"], // Replace with actual admin email
-      subject: `New Order Received - #${orderId.slice(0, 8)}`,
+      subject: `New Support Ticket - ${subject}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #2563eb; margin-bottom: 24px;">New Order Notification</h1>
+          <h1 style="color: #2563eb; margin-bottom: 24px;">New Support Ticket</h1>
           
           <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
-            <h2 style="margin-top: 0; color: #1e293b;">Order Details</h2>
-            <p><strong>Order ID:</strong> #${orderId.slice(0, 8)}</p>
-            <p><strong>Service:</strong> ${serviceName}</p>
-            <p><strong>Quantity:</strong> ${quantity.toLocaleString()}</p>
-            <p><strong>Total Amount:</strong> ₹${totalCost}</p>
-            <p><strong>Target Link:</strong> <a href="${link}" target="_blank">${link}</a></p>
+            <h2 style="margin-top: 0; color: #1e293b;">Ticket Details</h2>
+            <p><strong>Ticket ID:</strong> #${ticketId.slice(0, 8)}</p>
+            <p><strong>Subject:</strong> ${subject}</p>
+            <p><strong>Priority:</strong> <span style="color: ${priorityColor}; font-weight: bold;">${priority.toUpperCase()}</span></p>
+            <p><strong>From:</strong> ${userEmail}</p>
             <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
           </div>
 
-          <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
-            <h2 style="margin-top: 0; color: #1e293b;">Customer Information</h2>
-            <p><strong>Name:</strong> ${userName}</p>
-            <p><strong>Email:</strong> ${userEmail}</p>
+          <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 24px;">
+            <h3 style="margin-top: 0; color: #1e293b;">Message:</h3>
+            <p style="line-height: 1.6; color: #374151;">${message}</p>
           </div>
 
           <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #64748b;">
+            <p>Please respond to this ticket through the admin panel.</p>
             <p>This notification was sent automatically from SMM Kings.</p>
           </div>
         </div>
       `,
     });
 
-    console.log("Order notification email sent successfully:", emailResponse);
+    console.log("Ticket notification email sent successfully:", emailResponse);
 
     return new Response(JSON.stringify(emailResponse), {
       status: 200,
@@ -77,7 +74,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
   } catch (error: any) {
-    console.error("Error in send-order-notification function:", error);
+    console.error("Error in send-ticket-notification function:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

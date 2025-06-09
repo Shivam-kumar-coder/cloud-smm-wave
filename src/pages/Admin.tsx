@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,18 +7,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Settings, Plus, Edit, Trash2, Shield, AlertCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Settings, Plus, Edit, Trash2, Shield, AlertCircle, Package, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useServices } from '@/hooks/useServices';
+import { useAdminOrders, useUpdateOrderStatus } from '@/hooks/useAdminOrders';
+import { useAdminTickets, useCreateAdminReply } from '@/hooks/useAdminTickets';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useUserRole } from '@/hooks/useUserRole';
+import { format } from 'date-fns';
 
 const Admin = () => {
   const [isAddServiceOpen, setIsAddServiceOpen] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
+  const [replyingToTicket, setReplyingToTicket] = useState<string | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -32,7 +37,11 @@ const Admin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { data: services = [] } = useServices();
+  const { data: orders = [] } = useAdminOrders();
+  const { data: tickets = [] } = useAdminTickets();
   const { data: userRole, isLoading: roleLoading } = useUserRole();
+  const updateOrderStatus = useUpdateOrderStatus();
+  const createAdminReply = useCreateAdminReply();
   const queryClient = useQueryClient();
 
   const categories = ['Instagram', 'YouTube', 'TikTok', 'Facebook', 'Twitter', 'Telegram', 'LinkedIn'];
@@ -66,6 +75,62 @@ const Admin = () => {
       </DashboardLayout>
     );
   }
+
+  const handleUpdateOrderStatus = async (orderId: string, status: string) => {
+    try {
+      await updateOrderStatus.mutateAsync({ orderId, status });
+      toast({
+        title: 'Order Updated',
+        description: 'Order status has been updated successfully.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update order status.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSendReply = async (ticketId: string) => {
+    if (!replyMessage.trim()) return;
+
+    try {
+      await createAdminReply.mutateAsync({
+        ticket_id: ticketId,
+        message: replyMessage,
+      });
+      
+      setReplyMessage('');
+      setReplyingToTicket(null);
+      
+      toast({
+        title: 'Reply Sent',
+        description: 'Your reply has been sent to the user.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send reply.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'success':
+        return 'bg-green-500/10 text-green-500 border-green-500/20';
+      case 'processing':
+        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+      case 'pending':
+        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      case 'cancelled':
+        return 'bg-red-500/10 text-red-500 border-red-500/20';
+      default:
+        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -200,122 +265,9 @@ const Admin = () => {
               Admin Panel
             </h1>
             <p className="text-gray-600">
-              Manage services, pricing, and system settings.
+              Manage services, orders, tickets, and system settings.
             </p>
           </div>
-          <Dialog open={isAddServiceOpen} onOpenChange={(open) => {
-            setIsAddServiceOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button className="gradient-primary rounded-xl">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Service
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{editingService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
-                <DialogDescription>
-                  {editingService ? 'Update service details and pricing.' : 'Create a new SMM service with pricing details.'}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Service Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="e.g., Instagram Followers"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    required
-                    className="rounded-xl"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Service description..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    className="rounded-xl"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price per 1000 (₹)</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={formData.price_per_1000}
-                      onChange={(e) => setFormData({...formData, price_per_1000: e.target.value})}
-                      required
-                      className="rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="active">Active</Label>
-                    <div className="flex items-center space-x-2 pt-2">
-                      <Switch
-                        id="active"
-                        checked={formData.is_active}
-                        onCheckedChange={(checked) => setFormData({...formData, is_active: checked})}
-                      />
-                      <Label htmlFor="active">{formData.is_active ? 'Active' : 'Inactive'}</Label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="min">Min Quantity</Label>
-                    <Input
-                      id="min"
-                      type="number"
-                      placeholder="100"
-                      value={formData.min_quantity}
-                      onChange={(e) => setFormData({...formData, min_quantity: e.target.value})}
-                      className="rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="max">Max Quantity</Label>
-                    <Input
-                      id="max"
-                      type="number"
-                      placeholder="100000"
-                      value={formData.max_quantity}
-                      onChange={(e) => setFormData({...formData, max_quantity: e.target.value})}
-                      className="rounded-xl"
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full gradient-primary rounded-xl" disabled={isLoading}>
-                  {isLoading ? 'Saving...' : editingService ? 'Update Service' : 'Add Service'}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Admin Access Notice */}
@@ -328,13 +280,131 @@ const Admin = () => {
           </CardContent>
         </Card>
 
-        {/* Services Management */}
-        <Card className="light-card">
-          <CardHeader>
-            <CardTitle className="text-gray-900">Services Management</CardTitle>
-            <CardDescription>Manage your SMM services and pricing</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Tabs defaultValue="services" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="services">Services</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="tickets">Support Tickets</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="services" className="space-y-6">
+            <div className="flex justify-end">
+              <Dialog open={isAddServiceOpen} onOpenChange={(open) => {
+                setIsAddServiceOpen(open);
+                if (!open) resetForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="gradient-primary rounded-xl">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Service
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{editingService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
+                    <DialogDescription>
+                      {editingService ? 'Update service details and pricing.' : 'Create a new SMM service with pricing details.'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Service Name</Label>
+                      <Input
+                        id="name"
+                        placeholder="e.g., Instagram Followers"
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        required
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        placeholder="Service description..."
+                        value={formData.description}
+                        onChange={(e) => setFormData({...formData, description: e.target.value})}
+                        className="rounded-xl"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="price">Price per 1000 (₹)</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={formData.price_per_1000}
+                          onChange={(e) => setFormData({...formData, price_per_1000: e.target.value})}
+                          required
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="active">Active</Label>
+                        <div className="flex items-center space-x-2 pt-2">
+                          <Switch
+                            id="active"
+                            checked={formData.is_active}
+                            onCheckedChange={(checked) => setFormData({...formData, is_active: checked})}
+                          />
+                          <Label htmlFor="active">{formData.is_active ? 'Active' : 'Inactive'}</Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="min">Min Quantity</Label>
+                        <Input
+                          id="min"
+                          type="number"
+                          placeholder="100"
+                          value={formData.min_quantity}
+                          onChange={(e) => setFormData({...formData, min_quantity: e.target.value})}
+                          className="rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="max">Max Quantity</Label>
+                        <Input
+                          id="max"
+                          type="number"
+                          placeholder="100000"
+                          value={formData.max_quantity}
+                          onChange={(e) => setFormData({...formData, max_quantity: e.target.value})}
+                          className="rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <Button type="submit" className="w-full gradient-primary rounded-xl" disabled={isLoading}>
+                      {isLoading ? 'Saving...' : editingService ? 'Update Service' : 'Add Service'}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* Services Management */}
             <div className="space-y-4">
               {services.map((service) => (
                 <div key={service.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-200">
@@ -385,8 +455,156 @@ const Admin = () => {
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
+
+          <TabsContent value="orders" className="space-y-6">
+            <Card className="light-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Order Management
+                </CardTitle>
+                <CardDescription>View and manage all user orders</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {orders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-200">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-medium text-gray-900">#{order.id.slice(0, 8)}</h3>
+                          <Badge variant="outline" className="rounded-full">{order.services?.name}</Badge>
+                          <Badge variant="outline" className={getStatusColor(order.status)}>
+                            {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                          <div>
+                            <span className="font-medium">User:</span> {order.profiles?.full_name || 'Unknown'}
+                          </div>
+                          <div>
+                            <span className="font-medium">Quantity:</span> {order.quantity}
+                          </div>
+                          <div>
+                            <span className="font-medium">Amount:</span> ₹{order.total_cost}
+                          </div>
+                          <div>
+                            <span className="font-medium">Date:</span> {format(new Date(order.created_at), 'MMM dd, yyyy')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select value={order.status} onValueChange={(status) => handleUpdateOrderStatus(order.id, status)}>
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="processing">Processing</SelectItem>
+                            <SelectItem value="success">Success</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                  {orders.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No orders found</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tickets" className="space-y-6">
+            <Card className="light-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  Support Tickets
+                </CardTitle>
+                <CardDescription>View and respond to user support tickets</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {tickets.map((ticket) => (
+                    <div key={ticket.id} className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="font-medium text-gray-900">{ticket.subject}</h3>
+                          <p className="text-sm text-gray-600">
+                            From: {ticket.profiles?.full_name} ({ticket.profiles?.email})
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {format(new Date(ticket.created_at), 'MMM dd, HH:mm')}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className={getStatusColor(ticket.status)}>
+                          {ticket.status?.charAt(0).toUpperCase() + ticket.status?.slice(1)}
+                        </Badge>
+                      </div>
+                      
+                      <div className="bg-white p-3 rounded-lg mb-4">
+                        <p className="text-gray-700">{ticket.message}</p>
+                      </div>
+
+                      {ticket.support_replies && ticket.support_replies.length > 0 && (
+                        <div className="space-y-2 mb-4">
+                          <h4 className="font-medium text-sm">Replies:</h4>
+                          {ticket.support_replies.map((reply: any) => (
+                            <div key={reply.id} className={`p-3 rounded-lg ${reply.is_admin ? 'bg-blue-50 ml-4' : 'bg-gray-100 mr-4'}`}>
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="text-sm font-medium">
+                                  {reply.is_admin ? 'Admin' : 'User'}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {format(new Date(reply.created_at), 'MMM dd, HH:mm')}
+                                </span>
+                              </div>
+                              <p className="text-sm">{reply.message}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {replyingToTicket === ticket.id ? (
+                        <div className="space-y-3">
+                          <Textarea
+                            placeholder="Type your reply..."
+                            value={replyMessage}
+                            onChange={(e) => setReplyMessage(e.target.value)}
+                            rows={3}
+                          />
+                          <div className="flex gap-2">
+                            <Button onClick={() => handleSendReply(ticket.id)} size="sm">
+                              Send Reply
+                            </Button>
+                            <Button variant="outline" onClick={() => setReplyingToTicket(null)} size="sm">
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button onClick={() => setReplyingToTicket(ticket.id)} size="sm" variant="outline">
+                          Reply
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  {tickets.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No support tickets found</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
