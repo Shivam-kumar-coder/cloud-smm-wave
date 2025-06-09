@@ -26,14 +26,14 @@ export default function Signup() {
         title: "Signup Failed",
         description: error.message,
         variant: "destructive",
-        duration: 15000,
+        duration: 10000,
       })
-    } else if (data.user && !data.user.confirmed_at) {
+    } else {
       toast({
         title: "Email Confirmation Required",
         description: "Check your email to confirm your account.",
-        variant: "destructive", // 🔴 red dark border
-        duration: 15000, // 🕒 15 seconds
+        variant: "destructive", // 🔴 Red border
+        duration: 10000,
       })
     }
 
@@ -41,15 +41,15 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4">
       <form
         onSubmit={handleSignUp}
-        className="w-full max-w-md space-y-6 bg-white shadow-lg p-8 rounded-xl border"
+        className="w-full max-w-md space-y-6 bg-white shadow-md p-8 rounded-xl border border-gray-300"
       >
-        <h2 className="text-2xl font-bold text-center">Sign Up</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-800">Sign Up</h2>
 
         <div className="space-y-2">
-          <label htmlFor="email" className="block text-sm font-medium">
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             Email
           </label>
           <input
@@ -63,7 +63,7 @@ export default function Signup() {
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-medium">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
             Password
           </label>
           <input
@@ -87,3 +87,4 @@ export default function Signup() {
     </div>
   )
 }
+
