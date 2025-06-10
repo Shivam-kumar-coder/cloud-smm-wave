@@ -18,7 +18,10 @@ export const useAdminTickets = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching admin tickets:', error);
+        throw error;
+      }
       return data;
     },
     enabled: !!user,

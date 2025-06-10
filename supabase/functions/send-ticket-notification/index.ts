@@ -13,6 +13,7 @@ const corsHeaders = {
 interface TicketNotificationRequest {
   ticketId: string;
   userEmail: string;
+  userName?: string;
   subject: string;
   message: string;
   priority: string;
@@ -26,11 +27,24 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { 
       ticketId, 
-      userEmail, 
+      userEmail,
+      userName,
       subject, 
       message, 
       priority 
     }: TicketNotificationRequest = await req.json();
+
+    // Check if RESEND_API_KEY is available
+    if (!Deno.env.get("RESEND_API_KEY")) {
+      console.error("RESEND_API_KEY not found in environment variables");
+      return new Response(
+        JSON.stringify({ error: "Email service not configured" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
 
     const priorityColor = priority === 'high' ? '#dc2626' : priority === 'medium' ? '#f59e0b' : '#16a34a';
 
@@ -47,7 +61,7 @@ const handler = async (req: Request): Promise<Response> => {
             <p><strong>Ticket ID:</strong> #${ticketId.slice(0, 8)}</p>
             <p><strong>Subject:</strong> ${subject}</p>
             <p><strong>Priority:</strong> <span style="color: ${priorityColor}; font-weight: bold;">${priority.toUpperCase()}</span></p>
-            <p><strong>From:</strong> ${userEmail}</p>
+            <p><strong>From:</strong> ${userName || 'Unknown User'} (${userEmail})</p>
             <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
           </div>
 

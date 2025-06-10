@@ -50,16 +50,29 @@ export const useCreateSupportTicket = () => {
 
       if (error) throw error;
 
+      // Get user profile for name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
       // Send email notification to admin
-      await supabase.functions.invoke('send-ticket-notification', {
-        body: {
-          ticketId: data.id,
-          userEmail: user.email,
-          subject: ticketData.subject,
-          message: ticketData.message,
-          priority: ticketData.priority,
-        },
-      });
+      try {
+        await supabase.functions.invoke('send-ticket-notification', {
+          body: {
+            ticketId: data.id,
+            userEmail: user.email || '',
+            userName: profile?.full_name || 'Unknown User',
+            subject: ticketData.subject,
+            message: ticketData.message,
+            priority: ticketData.priority,
+          },
+        });
+      } catch (emailError) {
+        console.error('Failed to send ticket notification email:', emailError);
+        // Don't fail the ticket creation if email fails
+      }
 
       return data;
     },
@@ -95,6 +108,7 @@ export const useCreateSupportReply = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supportTickets', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['adminTickets'] });
     },
   });
 };

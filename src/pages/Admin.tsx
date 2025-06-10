@@ -37,8 +37,8 @@ const Admin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { data: services = [] } = useServices();
-  const { data: orders = [] } = useAdminOrders();
-  const { data: tickets = [] } = useAdminTickets();
+  const { data: orders = [], isLoading: ordersLoading } = useAdminOrders();
+  const { data: tickets = [], isLoading: ticketsLoading } = useAdminTickets();
   const { data: userRole, isLoading: roleLoading } = useUserRole();
   const updateOrderStatus = useUpdateOrderStatus();
   const createAdminReply = useCreateAdminReply();
@@ -84,6 +84,7 @@ const Admin = () => {
         description: 'Order status has been updated successfully.',
       });
     } catch (error: any) {
+      console.error('Error updating order status:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to update order status.',
@@ -109,6 +110,7 @@ const Admin = () => {
         description: 'Your reply has been sent to the user.',
       });
     } catch (error: any) {
+      console.error('Error sending reply:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to send reply.',
@@ -186,6 +188,7 @@ const Admin = () => {
       resetForm();
       setIsAddServiceOpen(false);
     } catch (error: any) {
+      console.error('Error saving service:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to save service.',
@@ -228,6 +231,7 @@ const Admin = () => {
       
       queryClient.invalidateQueries({ queryKey: ['services'] });
     } catch (error: any) {
+      console.error('Error deleting service:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to delete service.',
@@ -247,6 +251,7 @@ const Admin = () => {
       
       queryClient.invalidateQueries({ queryKey: ['services'] });
     } catch (error: any) {
+      console.error('Error updating service status:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to update service status.',
@@ -467,54 +472,71 @@ const Admin = () => {
                 <CardDescription>View and manage all user orders</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-200">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-medium text-gray-900">#{order.id.slice(0, 8)}</h3>
-                          <Badge variant="outline" className="rounded-full">{order.services?.name}</Badge>
-                          <Badge variant="outline" className={getStatusColor(order.status)}>
-                            {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
-                          </Badge>
+                {ordersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.map((order) => (
+                      <div key={order.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-200">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-medium text-gray-900">#{order.id.slice(0, 8)}</h3>
+                            <Badge variant="outline" className="rounded-full">{order.services?.name || 'Unknown Service'}</Badge>
+                            <Badge variant="outline" className={getStatusColor(order.status || 'pending')}>
+                              {(order.status || 'pending').charAt(0).toUpperCase() + (order.status || 'pending').slice(1)}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                            <div>
+                              <span className="font-medium">User:</span> {order.profiles?.full_name || 'Unknown User'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Quantity:</span> {order.quantity?.toLocaleString() || 0}
+                            </div>
+                            <div>
+                              <span className="font-medium">Amount:</span> ₹{order.total_cost || 0}
+                            </div>
+                            <div>
+                              <span className="font-medium">Date:</span> {format(new Date(order.created_at), 'MMM dd, yyyy')}
+                            </div>
+                          </div>
+                          {order.link && (
+                            <div className="mt-2 text-sm text-gray-600">
+                              <span className="font-medium">Link:</span> 
+                              <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">
+                                {order.link}
+                              </a>
+                            </div>
+                          )}
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                          <div>
-                            <span className="font-medium">User:</span> {order.profiles?.full_name || 'Unknown'}
-                          </div>
-                          <div>
-                            <span className="font-medium">Quantity:</span> {order.quantity}
-                          </div>
-                          <div>
-                            <span className="font-medium">Amount:</span> ₹{order.total_cost}
-                          </div>
-                          <div>
-                            <span className="font-medium">Date:</span> {format(new Date(order.created_at), 'MMM dd, yyyy')}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Select 
+                            value={order.status || 'pending'} 
+                            onValueChange={(status) => handleUpdateOrderStatus(order.id, status)}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="processing">Processing</SelectItem>
+                              <SelectItem value="success">Success</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Select value={order.status} onValueChange={(status) => handleUpdateOrderStatus(order.id, status)}>
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="processing">Processing</SelectItem>
-                            <SelectItem value="success">Success</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    ))}
+                    {orders.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No orders found</p>
                       </div>
-                    </div>
-                  ))}
-                  {orders.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>No orders found</p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -529,78 +551,84 @@ const Admin = () => {
                 <CardDescription>View and respond to user support tickets</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {tickets.map((ticket) => (
-                    <div key={ticket.id} className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="font-medium text-gray-900">{ticket.subject}</h3>
-                          <p className="text-sm text-gray-600">
-                            From: {ticket.profiles?.full_name} ({ticket.profiles?.email})
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {format(new Date(ticket.created_at), 'MMM dd, HH:mm')}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className={getStatusColor(ticket.status)}>
-                          {ticket.status?.charAt(0).toUpperCase() + ticket.status?.slice(1)}
-                        </Badge>
-                      </div>
-                      
-                      <div className="bg-white p-3 rounded-lg mb-4">
-                        <p className="text-gray-700">{ticket.message}</p>
-                      </div>
-
-                      {ticket.support_replies && ticket.support_replies.length > 0 && (
-                        <div className="space-y-2 mb-4">
-                          <h4 className="font-medium text-sm">Replies:</h4>
-                          {ticket.support_replies.map((reply: any) => (
-                            <div key={reply.id} className={`p-3 rounded-lg ${reply.is_admin ? 'bg-blue-50 ml-4' : 'bg-gray-100 mr-4'}`}>
-                              <div className="flex justify-between items-start mb-2">
-                                <span className="text-sm font-medium">
-                                  {reply.is_admin ? 'Admin' : 'User'}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {format(new Date(reply.created_at), 'MMM dd, HH:mm')}
-                                </span>
-                              </div>
-                              <p className="text-sm">{reply.message}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {replyingToTicket === ticket.id ? (
-                        <div className="space-y-3">
-                          <Textarea
-                            placeholder="Type your reply..."
-                            value={replyMessage}
-                            onChange={(e) => setReplyMessage(e.target.value)}
-                            rows={3}
-                          />
-                          <div className="flex gap-2">
-                            <Button onClick={() => handleSendReply(ticket.id)} size="sm">
-                              Send Reply
-                            </Button>
-                            <Button variant="outline" onClick={() => setReplyingToTicket(null)} size="sm">
-                              Cancel
-                            </Button>
+                {ticketsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {tickets.map((ticket) => (
+                      <div key={ticket.id} className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <h3 className="font-medium text-gray-900">{ticket.subject}</h3>
+                            <p className="text-sm text-gray-600">
+                              From: {ticket.profiles?.full_name || 'Unknown User'} ({ticket.profiles?.email || 'Unknown Email'})
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {format(new Date(ticket.created_at), 'MMM dd, HH:mm')}
+                            </p>
                           </div>
+                          <Badge variant="outline" className={getStatusColor(ticket.status || 'open')}>
+                            {(ticket.status || 'open').charAt(0).toUpperCase() + (ticket.status || 'open').slice(1)}
+                          </Badge>
                         </div>
-                      ) : (
-                        <Button onClick={() => setReplyingToTicket(ticket.id)} size="sm" variant="outline">
-                          Reply
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  {tickets.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>No support tickets found</p>
-                    </div>
-                  )}
-                </div>
+                        
+                        <div className="bg-white p-3 rounded-lg mb-4">
+                          <p className="text-gray-700">{ticket.message}</p>
+                        </div>
+
+                        {ticket.support_replies && ticket.support_replies.length > 0 && (
+                          <div className="space-y-2 mb-4">
+                            <h4 className="font-medium text-sm">Replies:</h4>
+                            {ticket.support_replies.map((reply: any) => (
+                              <div key={reply.id} className={`p-3 rounded-lg ${reply.is_admin ? 'bg-blue-50 ml-4' : 'bg-gray-100 mr-4'}`}>
+                                <div className="flex justify-between items-start mb-2">
+                                  <span className="text-sm font-medium">
+                                    {reply.is_admin ? 'Admin' : 'User'}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {format(new Date(reply.created_at), 'MMM dd, HH:mm')}
+                                  </span>
+                                </div>
+                                <p className="text-sm">{reply.message}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {replyingToTicket === ticket.id ? (
+                          <div className="space-y-3">
+                            <Textarea
+                              placeholder="Type your reply..."
+                              value={replyMessage}
+                              onChange={(e) => setReplyMessage(e.target.value)}
+                              rows={3}
+                            />
+                            <div className="flex gap-2">
+                              <Button onClick={() => handleSendReply(ticket.id)} size="sm">
+                                Send Reply
+                              </Button>
+                              <Button variant="outline" onClick={() => setReplyingToTicket(null)} size="sm">
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button onClick={() => setReplyingToTicket(ticket.id)} size="sm" variant="outline">
+                            Reply
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    {tickets.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No support tickets found</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

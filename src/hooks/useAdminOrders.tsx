@@ -18,7 +18,10 @@ export const useAdminOrders = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching admin orders:', error);
+        throw error;
+      }
       return data;
     },
     enabled: !!user,

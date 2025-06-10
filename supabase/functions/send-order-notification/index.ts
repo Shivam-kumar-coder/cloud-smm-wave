@@ -36,6 +36,18 @@ const handler = async (req: Request): Promise<Response> => {
       link 
     }: OrderNotificationRequest = await req.json();
 
+    // Check if RESEND_API_KEY is available
+    if (!Deno.env.get("RESEND_API_KEY")) {
+      console.error("RESEND_API_KEY not found in environment variables");
+      return new Response(
+        JSON.stringify({ error: "Email service not configured" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
     const emailResponse = await resend.emails.send({
       from: "SMM Kings <orders@smmkings.com>",
       to: ["admin@smmkings.com"], // Replace with actual admin email
@@ -61,6 +73,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
 
           <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #64748b;">
+            <p>Please process this order through the admin panel.</p>
             <p>This notification was sent automatically from SMM Kings.</p>
           </div>
         </div>
