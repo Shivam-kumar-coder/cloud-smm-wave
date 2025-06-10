@@ -13,8 +13,16 @@ export const useAdminOrders = () => {
         .from('orders')
         .select(`
           *,
-          services (name, category),
-          profiles!orders_user_id_fkey (full_name, email)
+          services (
+            id,
+            name,
+            category
+          ),
+          profiles!orders_user_id_fkey (
+            id,
+            full_name,
+            email
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -35,9 +43,24 @@ export const useUpdateOrderStatus = () => {
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
       const { data, error } = await supabase
         .from('orders')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ 
+          status, 
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', orderId)
-        .select()
+        .select(`
+          *,
+          services (
+            id,
+            name,
+            category
+          ),
+          profiles!orders_user_id_fkey (
+            id,
+            full_name,
+            email
+          )
+        `)
         .single();
 
       if (error) throw error;

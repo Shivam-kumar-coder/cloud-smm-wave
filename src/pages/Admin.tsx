@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,12 +9,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, Plus, Edit, Trash2, Shield, AlertCircle, Package, MessageSquare } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Settings, Plus, Edit, Trash2, Shield, AlertCircle, Package, MessageSquare, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useServices } from '@/hooks/useServices';
 import { useAdminOrders, useUpdateOrderStatus } from '@/hooks/useAdminOrders';
-import { useAdminTickets, useCreateAdminReply } from '@/hooks/useAdminTickets';
+import { useAdminTickets, useCreateAdminReply, useUpdateTicketStatus } from '@/hooks/useAdminTickets';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -36,12 +38,13 @@ const Admin = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { data: services = [] } = useServices();
+  const { data: services = [], isLoading: servicesLoading } = useServices();
   const { data: orders = [], isLoading: ordersLoading } = useAdminOrders();
   const { data: tickets = [], isLoading: ticketsLoading } = useAdminTickets();
   const { data: userRole, isLoading: roleLoading } = useUserRole();
   const updateOrderStatus = useUpdateOrderStatus();
   const createAdminReply = useCreateAdminReply();
+  const updateTicketStatus = useUpdateTicketStatus();
   const queryClient = useQueryClient();
 
   const categories = ['Instagram', 'YouTube', 'TikTok', 'Facebook', 'Twitter', 'Telegram', 'LinkedIn'];
@@ -51,7 +54,7 @@ const Admin = () => {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         </div>
       </DashboardLayout>
     );
@@ -119,13 +122,34 @@ const Admin = () => {
     }
   };
 
+  const handleUpdateTicketStatus = async (ticketId: string, status: string) => {
+    try {
+      await updateTicketStatus.mutateAsync({ ticketId, status });
+      toast({
+        title: 'Ticket Updated',
+        description: 'Ticket status has been updated successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error updating ticket status:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update ticket status.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'success':
+      case 'completed':
+      case 'closed':
         return 'bg-green-500/10 text-green-500 border-green-500/20';
       case 'processing':
+      case 'in_progress':
         return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
       case 'pending':
+      case 'open':
         return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
       case 'cancelled':
         return 'bg-red-500/10 text-red-500 border-red-500/20';
@@ -285,12 +309,228 @@ const Admin = () => {
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="services" className="w-full">
+        <Tabs defaultValue="orders" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="services">Services</TabsTrigger>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="tickets">Support Tickets</TabsTrigger>
+            <TabsTrigger value="orders">Orders ({orders.length})</TabsTrigger>
+            <TabsTrigger value="tickets">Support Tickets ({tickets.length})</TabsTrigger>
+            <TabsTrigger value="services">Services ({services.length})</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="orders" className="space-y-6">
+            <Card className="light-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Order Management
+                </CardTitle>
+                <CardDescription>View and manage all user orders</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {ordersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  </div>
+                ) : orders.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Order ID</TableHead>
+                          <TableHead>User</TableHead>
+                          <TableHead>Service</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {orders.map((order) => (
+                          <TableRow key={order.id}>
+                            <TableCell className="font-medium">
+                              #{order.id.slice(0, 8)}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">
+                                  {order.profiles?.full_name || 'Unknown User'}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {order.profiles?.email || 'No email'}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">
+                                  {order.services?.name || 'Unknown Service'}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {order.services?.category || 'Unknown Category'}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{order.quantity?.toLocaleString() || 0}</TableCell>
+                            <TableCell>₹{order.total_cost || 0}</TableCell>
+                            <TableCell>
+                              <Badge className={getStatusColor(order.status || 'pending')}>
+                                {(order.status || 'pending').charAt(0).toUpperCase() + (order.status || 'pending').slice(1)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(order.created_at), 'MMM dd, yyyy')}
+                            </TableCell>
+                            <TableCell>
+                              <Select 
+                                value={order.status || 'pending'} 
+                                onValueChange={(status) => handleUpdateOrderStatus(order.id, status)}
+                                disabled={updateOrderStatus.isPending}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="processing">Processing</SelectItem>
+                                  <SelectItem value="success">Success</SelectItem>
+                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No orders found</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tickets" className="space-y-6">
+            <Card className="light-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  Support Tickets
+                </CardTitle>
+                <CardDescription>View and respond to user support tickets</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {ticketsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {tickets.map((ticket) => (
+                      <div key={ticket.id} className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900">{ticket.subject}</h3>
+                            <p className="text-sm text-gray-600">
+                              From: {ticket.profiles?.full_name || 'Unknown User'} ({ticket.profiles?.email || 'No email'})
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {format(new Date(ticket.created_at), 'MMM dd, HH:mm')}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getStatusColor(ticket.status || 'open')}>
+                              {(ticket.status || 'open').charAt(0).toUpperCase() + (ticket.status || 'open').slice(1)}
+                            </Badge>
+                            <Select 
+                              value={ticket.status || 'open'} 
+                              onValueChange={(status) => handleUpdateTicketStatus(ticket.id, status)}
+                              disabled={updateTicketStatus.isPending}
+                            >
+                              <SelectTrigger className="w-24">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">Open</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="closed">Closed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div className="bg-white p-3 rounded-lg mb-4">
+                          <p className="text-gray-700">{ticket.message}</p>
+                        </div>
+
+                        {ticket.support_replies && ticket.support_replies.length > 0 && (
+                          <div className="space-y-2 mb-4">
+                            <h4 className="font-medium text-sm">Replies:</h4>
+                            {ticket.support_replies.map((reply: any) => (
+                              <div key={reply.id} className={`p-3 rounded-lg ${reply.is_admin ? 'bg-blue-50 ml-4' : 'bg-gray-100 mr-4'}`}>
+                                <div className="flex justify-between items-start mb-2">
+                                  <span className="text-sm font-medium">
+                                    {reply.is_admin ? 'Admin' : (reply.profiles?.full_name || 'User')}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {format(new Date(reply.created_at), 'MMM dd, HH:mm')}
+                                  </span>
+                                </div>
+                                <p className="text-sm">{reply.message}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {replyingToTicket === ticket.id ? (
+                          <div className="space-y-3">
+                            <Textarea
+                              placeholder="Type your reply..."
+                              value={replyMessage}
+                              onChange={(e) => setReplyMessage(e.target.value)}
+                              rows={3}
+                            />
+                            <div className="flex gap-2">
+                              <Button 
+                                onClick={() => handleSendReply(ticket.id)} 
+                                size="sm"
+                                disabled={createAdminReply.isPending || !replyMessage.trim()}
+                              >
+                                {createAdminReply.isPending ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Sending...
+                                  </>
+                                ) : (
+                                  'Send Reply'
+                                )}
+                              </Button>
+                              <Button variant="outline" onClick={() => setReplyingToTicket(null)} size="sm">
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button onClick={() => setReplyingToTicket(ticket.id)} size="sm" variant="outline">
+                            Reply
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    {tickets.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No support tickets found</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="services" className="space-y-6">
             <div className="flex justify-end">
@@ -411,48 +651,54 @@ const Admin = () => {
 
             {/* Services Management */}
             <div className="space-y-4">
-              {services.map((service) => (
-                <div key={service.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-200">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-medium text-gray-900">{service.name}</h3>
-                      <Badge variant={service.is_active ? "default" : "secondary"} className="rounded-full">
-                        {service.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                      <Badge variant="outline" className="rounded-full">{service.category}</Badge>
-                    </div>
-                    <p className="text-sm text-gray-600">{service.description}</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                      <span>₹{service.price_per_1000}/1k</span>
-                      <span>Min: {service.min_quantity}</span>
-                      <span>Max: {service.max_quantity}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={service.is_active}
-                      onCheckedChange={() => toggleServiceStatus(service.id, service.is_active)}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(service)}
-                      className="rounded-lg"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(service.id)}
-                      className="rounded-lg hover:bg-red-50 hover:border-red-200"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
+              {servicesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                 </div>
-              ))}
-              {services.length === 0 && (
+              ) : (
+                services.map((service) => (
+                  <div key={service.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-200">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-medium text-gray-900">{service.name}</h3>
+                        <Badge variant={service.is_active ? "default" : "secondary"} className="rounded-full">
+                          {service.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <Badge variant="outline" className="rounded-full">{service.category}</Badge>
+                      </div>
+                      <p className="text-sm text-gray-600">{service.description}</p>
+                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                        <span>₹{service.price_per_1000}/1k</span>
+                        <span>Min: {service.min_quantity}</span>
+                        <span>Max: {service.max_quantity}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={service.is_active}
+                        onCheckedChange={() => toggleServiceStatus(service.id, service.is_active)}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(service)}
+                        className="rounded-lg"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(service.id)}
+                        className="rounded-lg hover:bg-red-50 hover:border-red-200"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+              {services.length === 0 && !servicesLoading && (
                 <div className="text-center py-8 text-gray-500">
                   <Settings className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No services found</p>
@@ -460,177 +706,6 @@ const Admin = () => {
                 </div>
               )}
             </div>
-          </TabsContent>
-
-          <TabsContent value="orders" className="space-y-6">
-            <Card className="light-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="w-5 h-5" />
-                  Order Management
-                </CardTitle>
-                <CardDescription>View and manage all user orders</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {ordersLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {orders.map((order) => (
-                      <div key={order.id} className="flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-200">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-medium text-gray-900">#{order.id.slice(0, 8)}</h3>
-                            <Badge variant="outline" className="rounded-full">{order.services?.name || 'Unknown Service'}</Badge>
-                            <Badge variant="outline" className={getStatusColor(order.status || 'pending')}>
-                              {(order.status || 'pending').charAt(0).toUpperCase() + (order.status || 'pending').slice(1)}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                            <div>
-                              <span className="font-medium">User:</span> {order.profiles?.full_name || 'Unknown User'}
-                            </div>
-                            <div>
-                              <span className="font-medium">Quantity:</span> {order.quantity?.toLocaleString() || 0}
-                            </div>
-                            <div>
-                              <span className="font-medium">Amount:</span> ₹{order.total_cost || 0}
-                            </div>
-                            <div>
-                              <span className="font-medium">Date:</span> {format(new Date(order.created_at), 'MMM dd, yyyy')}
-                            </div>
-                          </div>
-                          {order.link && (
-                            <div className="mt-2 text-sm text-gray-600">
-                              <span className="font-medium">Link:</span> 
-                              <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">
-                                {order.link}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Select 
-                            value={order.status || 'pending'} 
-                            onValueChange={(status) => handleUpdateOrderStatus(order.id, status)}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="processing">Processing</SelectItem>
-                              <SelectItem value="success">Success</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    ))}
-                    {orders.length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
-                        <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>No orders found</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="tickets" className="space-y-6">
-            <Card className="light-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" />
-                  Support Tickets
-                </CardTitle>
-                <CardDescription>View and respond to user support tickets</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {ticketsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {tickets.map((ticket) => (
-                      <div key={ticket.id} className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <h3 className="font-medium text-gray-900">{ticket.subject}</h3>
-                            <p className="text-sm text-gray-600">
-                              From: {ticket.profiles?.full_name || 'Unknown User'} ({ticket.profiles?.email || 'Unknown Email'})
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {format(new Date(ticket.created_at), 'MMM dd, HH:mm')}
-                            </p>
-                          </div>
-                          <Badge variant="outline" className={getStatusColor(ticket.status || 'open')}>
-                            {(ticket.status || 'open').charAt(0).toUpperCase() + (ticket.status || 'open').slice(1)}
-                          </Badge>
-                        </div>
-                        
-                        <div className="bg-white p-3 rounded-lg mb-4">
-                          <p className="text-gray-700">{ticket.message}</p>
-                        </div>
-
-                        {ticket.support_replies && ticket.support_replies.length > 0 && (
-                          <div className="space-y-2 mb-4">
-                            <h4 className="font-medium text-sm">Replies:</h4>
-                            {ticket.support_replies.map((reply: any) => (
-                              <div key={reply.id} className={`p-3 rounded-lg ${reply.is_admin ? 'bg-blue-50 ml-4' : 'bg-gray-100 mr-4'}`}>
-                                <div className="flex justify-between items-start mb-2">
-                                  <span className="text-sm font-medium">
-                                    {reply.is_admin ? 'Admin' : 'User'}
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    {format(new Date(reply.created_at), 'MMM dd, HH:mm')}
-                                  </span>
-                                </div>
-                                <p className="text-sm">{reply.message}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {replyingToTicket === ticket.id ? (
-                          <div className="space-y-3">
-                            <Textarea
-                              placeholder="Type your reply..."
-                              value={replyMessage}
-                              onChange={(e) => setReplyMessage(e.target.value)}
-                              rows={3}
-                            />
-                            <div className="flex gap-2">
-                              <Button onClick={() => handleSendReply(ticket.id)} size="sm">
-                                Send Reply
-                              </Button>
-                              <Button variant="outline" onClick={() => setReplyingToTicket(null)} size="sm">
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <Button onClick={() => setReplyingToTicket(ticket.id)} size="sm" variant="outline">
-                            Reply
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    {tickets.length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
-                        <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>No support tickets found</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>

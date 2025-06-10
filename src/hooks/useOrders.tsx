@@ -15,12 +15,19 @@ export const useOrders = () => {
         .from('orders')
         .select(`
           *,
-          services (name, category)
+          services (
+            id,
+            name,
+            category
+          )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching orders:', error);
+        throw error;
+      }
       return data;
     },
     enabled: !!user,
@@ -34,46 +41,46 @@ export const useCreateOrder = () => {
   return useMutation({
     mutationFn: async (orderData: {
       service_id: string;
-      link: string;
       quantity: number;
+      link: string;
       total_cost: number;
-      serviceName?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
         .from('orders')
         .insert({
-          service_id: orderData.service_id,
-          link: orderData.link,
-          quantity: orderData.quantity,
-          total_cost: orderData.total_cost,
+          ...orderData,
           user_id: user.id,
-          status: 'pending',
         })
-        .select()
+        .select(`
+          *,
+          services (
+            id,
+            name,
+            category
+          ),
+          profiles!orders_user_id_fkey (
+            id,
+            full_name,
+            email
+          )
+        `)
         .single();
 
       if (error) throw error;
-
-      // Get user profile for name
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
 
       // Send email notification to admin
       try {
         await supabase.functions.invoke('send-order-notification', {
           body: {
             orderId: data.id,
-            userName: profile?.full_name || 'Unknown User',
-            userEmail: user.email || '',
-            serviceName: orderData.serviceName || 'Unknown Service',
-            quantity: orderData.quantity,
-            totalCost: orderData.total_cost,
-            link: orderData.link,
+            userName: data.profiles?.full_name || 'Unknown User',
+            userEmail: data.profiles?.email || user.email || '',
+            serviceName: data.services?.name || 'Unknown Service',
+            quantity: data.quantity,
+            totalCost: data.total_cost,
+            link: data.link,
           },
         });
       } catch (emailError) {
@@ -85,6 +92,7 @@ export const useCreateOrder = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
     },
   });
 };
