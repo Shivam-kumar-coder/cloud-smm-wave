@@ -13,7 +13,7 @@ export const useAdminOrders = () => {
         .from('orders')
         .select(`
           *,
-          services (
+          services!orders_service_id_fkey (
             id,
             name,
             category
@@ -50,7 +50,7 @@ export const useUpdateOrderStatus = () => {
         .eq('id', orderId)
         .select(`
           *,
-          services (
+          services!orders_service_id_fkey (
             id,
             name,
             category

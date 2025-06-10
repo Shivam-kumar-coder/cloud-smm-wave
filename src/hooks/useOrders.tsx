@@ -15,7 +15,7 @@ export const useOrders = () => {
         .from('orders')
         .select(`
           *,
-          services (
+          services!orders_service_id_fkey (
             id,
             name,
             category
@@ -55,28 +55,30 @@ export const useCreateOrder = () => {
         })
         .select(`
           *,
-          services (
+          services!orders_service_id_fkey (
             id,
             name,
             category
-          ),
-          profiles!orders_user_id_fkey (
-            id,
-            full_name,
-            email
           )
         `)
         .single();
 
       if (error) throw error;
 
+      // Get user profile for email notification
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', user.id)
+        .single();
+
       // Send email notification to admin
       try {
         await supabase.functions.invoke('send-order-notification', {
           body: {
             orderId: data.id,
-            userName: data.profiles?.full_name || 'Unknown User',
-            userEmail: data.profiles?.email || user.email || '',
+            userName: profile?.full_name || 'Unknown User',
+            userEmail: profile?.email || user.email || '',
             serviceName: data.services?.name || 'Unknown Service',
             quantity: data.quantity,
             totalCost: data.total_cost,
