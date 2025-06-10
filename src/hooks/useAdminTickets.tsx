@@ -90,14 +90,14 @@ export const useCreateAdminReply = () => {
 
       if (ticketError) {
         console.error('Error fetching ticket for email:', ticketError);
-      } else if (ticket) {
+      } else if (ticket && ticket.profiles) {
         // Send email notification to user
         try {
           await supabase.functions.invoke('send-reply-notification', {
             body: {
               ticketId: ticket.id,
-              userEmail: ticket.profiles?.email || '',
-              userName: ticket.profiles?.full_name || 'User',
+              userEmail: ticket.profiles.email || '',
+              userName: ticket.profiles.full_name || 'User',
               subject: ticket.subject,
               replyMessage: replyData.message,
               isFromAdmin: true,

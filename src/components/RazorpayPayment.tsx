@@ -23,6 +23,16 @@ const RazorpayPayment = ({ onSuccess }: RazorpayPaymentProps) => {
   const { toast } = useToast();
   const addFunds = useAddFunds();
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handlePayment = async () => {
     const paymentAmount = parseFloat(amount);
     
@@ -38,10 +48,15 @@ const RazorpayPayment = ({ onSuccess }: RazorpayPaymentProps) => {
     setIsLoading(true);
 
     try {
-      // In production, you would get the order_id from your backend
-      // For demo purposes, we'll simulate successful payment
+      // Load Razorpay script
+      const scriptLoaded = await loadRazorpayScript();
+      
+      if (!scriptLoaded) {
+        throw new Error('Failed to load Razorpay SDK');
+      }
+
       const options = {
-        key: 'rzp_test_9999999999', // Replace with your Razorpay key
+        key: 'rzp_test_GB1Gh077tKVWWP', // Your test key
         amount: paymentAmount * 100, // Amount in paise
         currency: 'INR',
         name: 'SMM Kings',
@@ -49,6 +64,7 @@ const RazorpayPayment = ({ onSuccess }: RazorpayPaymentProps) => {
         order_id: `order_${Date.now()}`, // In production, get this from backend
         handler: async function (response: any) {
           try {
+            console.log('Payment successful:', response);
             await addFunds.mutateAsync(paymentAmount);
             toast({
               title: 'Payment Successful!',
@@ -57,12 +73,14 @@ const RazorpayPayment = ({ onSuccess }: RazorpayPaymentProps) => {
             setAmount('');
             onSuccess?.();
           } catch (error) {
+            console.error('Error updating wallet:', error);
             toast({
               title: 'Error',
               description: 'Failed to update wallet balance',
               variant: 'destructive',
             });
           }
+          setIsLoading(false);
         },
         prefill: {
           name: 'User Name',
@@ -78,31 +96,10 @@ const RazorpayPayment = ({ onSuccess }: RazorpayPaymentProps) => {
         },
       };
 
-      if (window.Razorpay) {
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      } else {
-        // Simulate payment for demo
-        setTimeout(async () => {
-          try {
-            await addFunds.mutateAsync(paymentAmount);
-            toast({
-              title: 'Payment Successful!',
-              description: `₹${paymentAmount} has been added to your wallet.`,
-            });
-            setAmount('');
-            onSuccess?.();
-          } catch (error) {
-            toast({
-              title: 'Error',
-              description: 'Failed to update wallet balance',
-              variant: 'destructive',
-            });
-          }
-          setIsLoading(false);
-        }, 2000);
-      }
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (error) {
+      console.error('Payment error:', error);
       toast({
         title: 'Payment Failed',
         description: 'Unable to process payment. Please try again.',
@@ -129,6 +126,7 @@ const RazorpayPayment = ({ onSuccess }: RazorpayPaymentProps) => {
             placeholder="Enter amount (min ₹10)"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            className="rounded-xl"
           />
         </div>
         
@@ -140,6 +138,7 @@ const RazorpayPayment = ({ onSuccess }: RazorpayPaymentProps) => {
               variant="outline"
               size="sm"
               onClick={() => setAmount(quickAmount.toString())}
+              className="rounded-lg"
             >
               ₹{quickAmount}
             </Button>
@@ -148,11 +147,17 @@ const RazorpayPayment = ({ onSuccess }: RazorpayPaymentProps) => {
 
         <Button
           onClick={handlePayment}
-          className="w-full gradient-primary"
+          className="w-full gradient-primary rounded-xl"
           disabled={!amount || parseFloat(amount) < 10 || isLoading}
         >
           {isLoading ? 'Processing...' : `Pay ₹${amount || '0'}`}
         </Button>
+
+        <div className="text-xs text-gray-500 mt-2">
+          <p>Test Mode: Use test card details</p>
+          <p>Card: 4111 1111 1111 1111</p>
+          <p>CVV: Any 3 digits | Expiry: Any future date</p>
+        </div>
       </CardContent>
     </Card>
   );

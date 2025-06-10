@@ -34,6 +34,14 @@ const handler = async (req: Request): Promise<Response> => {
       priority 
     }: TicketNotificationRequest = await req.json();
 
+    console.log("Received ticket notification request:", {
+      ticketId,
+      userEmail,
+      userName,
+      subject,
+      priority
+    });
+
     // Check if RESEND_API_KEY is available
     if (!Deno.env.get("RESEND_API_KEY")) {
       console.error("RESEND_API_KEY not found in environment variables");
@@ -80,7 +88,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Ticket notification email sent successfully:", emailResponse);
 
-    return new Response(JSON.stringify(emailResponse), {
+    return new Response(JSON.stringify({
+      success: true,
+      emailId: emailResponse.data?.id,
+      message: "Ticket notification sent successfully"
+    }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
@@ -90,7 +102,10 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in send-ticket-notification function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        success: false 
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
