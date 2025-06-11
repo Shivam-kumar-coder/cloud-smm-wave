@@ -17,11 +17,6 @@ export const useAdminOrders = () => {
             id,
             name,
             category
-          ),
-          profiles!orders_user_id_fkey (
-            id,
-            full_name,
-            email
           )
         `)
         .order('created_at', { ascending: false });
@@ -30,7 +25,21 @@ export const useAdminOrders = () => {
         console.error('Error fetching admin orders:', error);
         throw error;
       }
-      return data;
+
+      // Get user profiles separately
+      const userIds = [...new Set(data.map(order => order.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds);
+
+      // Combine orders with profiles
+      const ordersWithProfiles = data.map(order => ({
+        ...order,
+        profile: profiles?.find(profile => profile.id === order.user_id) || null
+      }));
+
+      return ordersWithProfiles;
     },
     enabled: !!user,
   });
@@ -48,19 +57,7 @@ export const useUpdateOrderStatus = () => {
           updated_at: new Date().toISOString() 
         })
         .eq('id', orderId)
-        .select(`
-          *,
-          services!orders_service_id_fkey (
-            id,
-            name,
-            category
-          ),
-          profiles!orders_user_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
+        .select()
         .single();
 
       if (error) throw error;

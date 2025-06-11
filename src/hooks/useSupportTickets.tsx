@@ -20,19 +20,33 @@ export const useSupportTickets = () => {
             message,
             is_admin,
             created_at,
-            user_id,
-            profiles!support_replies_user_id_fkey (
-              id,
-              full_name,
-              email
-            )
+            user_id
           )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+
+      // Get profiles for replies
+      const replyUserIds = data.flatMap(ticket => 
+        ticket.support_replies?.map(reply => reply.user_id) || []
+      );
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', replyUserIds);
+
+      // Combine with profiles
+      const ticketsWithProfiles = data.map(ticket => ({
+        ...ticket,
+        support_replies: ticket.support_replies?.map(reply => ({
+          ...reply,
+          profile: profiles?.find(profile => profile.id === reply.user_id) || null
+        })) || []
+      }));
+
+      return ticketsWithProfiles;
     },
     enabled: !!user,
   });
@@ -60,31 +74,6 @@ export const useCreateSupportTicket = () => {
         .single();
 
       if (error) throw error;
-
-      // Get user profile for name
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-
-      // Send email notification to admin
-      try {
-        await supabase.functions.invoke('send-ticket-notification', {
-          body: {
-            ticketId: data.id,
-            userEmail: user.email || '',
-            userName: profile?.full_name || 'Unknown User',
-            subject: ticketData.subject,
-            message: ticketData.message,
-            priority: ticketData.priority,
-          },
-        });
-      } catch (emailError) {
-        console.error('Failed to send ticket notification email:', emailError);
-        // Don't fail the ticket creation if email fails
-      }
-
       return data;
     },
     onSuccess: () => {
@@ -104,7 +93,6 @@ export const useCreateSupportReply = () => {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Insert the reply
       const { data: reply, error: replyError } = await supabase
         .from('support_replies')
         .insert({
@@ -112,59 +100,10 @@ export const useCreateSupportReply = () => {
           user_id: user.id,
           is_admin: false,
         })
-        .select(`
-          *,
-          profiles!support_replies_user_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
+        .select()
         .single();
 
       if (replyError) throw replyError;
-
-      // Get ticket details for email notification
-      const { data: ticket, error: ticketError } = await supabase
-        .from('support_tickets')
-        .select(`
-          *,
-          profiles!support_tickets_user_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
-        .eq('id', replyData.ticket_id)
-        .single();
-
-      if (ticketError) {
-        console.error('Error fetching ticket for email:', ticketError);
-      } else if (ticket) {
-        // Get user profile
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('full_name, email')
-          .eq('id', user.id)
-          .single();
-
-        // Send email notification to admin
-        try {
-          await supabase.functions.invoke('send-reply-notification', {
-            body: {
-              ticketId: ticket.id,
-              userEmail: userProfile?.email || user.email || '',
-              userName: userProfile?.full_name || 'User',
-              subject: ticket.subject,
-              replyMessage: replyData.message,
-              isFromAdmin: false,
-            },
-          });
-        } catch (emailError) {
-          console.error('Failed to send reply notification email:', emailError);
-        }
-      }
-
       return reply;
     },
     onSuccess: () => {

@@ -47,6 +47,20 @@ export const useCreateOrder = () => {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
+      // Check user balance first
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('balance')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if ((profile.balance || 0) < orderData.total_cost) {
+        throw new Error('Insufficient balance. Please add funds to your wallet.');
+      }
+
+      // Create order
       const { data, error } = await supabase
         .from('orders')
         .insert({
@@ -65,36 +79,32 @@ export const useCreateOrder = () => {
 
       if (error) throw error;
 
-      // Get user profile for email notification
-      const { data: profile } = await supabase
+      // Deduct amount from user balance
+      const newBalance = (profile.balance || 0) - orderData.total_cost;
+      const { error: updateError } = await supabase
         .from('profiles')
-        .select('full_name, email')
-        .eq('id', user.id)
-        .single();
+        .update({ balance: newBalance })
+        .eq('id', user.id);
 
-      // Send email notification to admin
-      try {
-        await supabase.functions.invoke('send-order-notification', {
-          body: {
-            orderId: data.id,
-            userName: profile?.full_name || 'Unknown User',
-            userEmail: profile?.email || user.email || '',
-            serviceName: data.services?.name || 'Unknown Service',
-            quantity: data.quantity,
-            totalCost: data.total_cost,
-            link: data.link,
-          },
+      if (updateError) throw updateError;
+
+      // Create transaction record
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'order',
+          amount: orderData.total_cost,
+          description: `Order for ${data.services?.name || 'Unknown Service'}`,
+          status: 'completed'
         });
-      } catch (emailError) {
-        console.error('Failed to send order notification email:', emailError);
-        // Don't fail the order creation if email fails
-      }
 
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
     },
   });
 };

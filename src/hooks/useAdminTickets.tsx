@@ -13,22 +13,12 @@ export const useAdminTickets = () => {
         .from('support_tickets')
         .select(`
           *,
-          profiles!support_tickets_user_id_fkey (
-            id,
-            full_name,
-            email
-          ),
           support_replies (
             id,
             message,
             is_admin,
             created_at,
-            user_id,
-            profiles!support_replies_user_id_fkey (
-              id,
-              full_name,
-              email
-            )
+            user_id
           )
         `)
         .order('created_at', { ascending: false });
@@ -37,7 +27,25 @@ export const useAdminTickets = () => {
         console.error('Error fetching admin tickets:', error);
         throw error;
       }
-      return data;
+
+      // Get user profiles separately
+      const userIds = [...new Set(data.map(ticket => ticket.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds);
+
+      // Combine tickets with profiles
+      const ticketsWithProfiles = data.map(ticket => ({
+        ...ticket,
+        profile: profiles?.find(profile => profile.id === ticket.user_id) || null,
+        support_replies: ticket.support_replies?.map(reply => ({
+          ...reply,
+          profile: profiles?.find(profile => profile.id === reply.user_id) || null
+        })) || []
+      }));
+
+      return ticketsWithProfiles;
     },
     enabled: !!user,
   });
@@ -54,7 +62,6 @@ export const useCreateAdminReply = () => {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Insert the reply
       const { data: reply, error: replyError } = await supabase
         .from('support_replies')
         .insert({
@@ -62,52 +69,10 @@ export const useCreateAdminReply = () => {
           user_id: user.id,
           is_admin: true,
         })
-        .select(`
-          *,
-          profiles!support_replies_user_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
+        .select()
         .single();
 
       if (replyError) throw replyError;
-
-      // Get ticket details for email notification
-      const { data: ticket, error: ticketError } = await supabase
-        .from('support_tickets')
-        .select(`
-          *,
-          profiles!support_tickets_user_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
-        .eq('id', replyData.ticket_id)
-        .single();
-
-      if (ticketError) {
-        console.error('Error fetching ticket for email:', ticketError);
-      } else if (ticket && ticket.profiles) {
-        // Send email notification to user
-        try {
-          await supabase.functions.invoke('send-reply-notification', {
-            body: {
-              ticketId: ticket.id,
-              userEmail: ticket.profiles.email || '',
-              userName: ticket.profiles.full_name || 'User',
-              subject: ticket.subject,
-              replyMessage: replyData.message,
-              isFromAdmin: true,
-            },
-          });
-        } catch (emailError) {
-          console.error('Failed to send reply notification email:', emailError);
-        }
-      }
-
       return reply;
     },
     onSuccess: () => {

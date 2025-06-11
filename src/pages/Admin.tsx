@@ -354,10 +354,10 @@ const Admin = () => {
                             <TableCell>
                               <div>
                                 <div className="font-medium">
-                                  {order.profiles?.full_name || 'Unknown User'}
+                                  {order.profile?.full_name || 'Unknown User'}
                                 </div>
                                 <div className="text-sm text-gray-500">
-                                  {order.profiles?.email || 'No email'}
+                                  {order.profile?.email || 'No email'}
                                 </div>
                               </div>
                             </TableCell>
@@ -435,7 +435,7 @@ const Admin = () => {
                           <div className="flex-1">
                             <h3 className="font-medium text-gray-900">{ticket.subject}</h3>
                             <p className="text-sm text-gray-600">
-                              From: {ticket.profiles?.full_name || 'Unknown User'} ({ticket.profiles?.email || 'No email'})
+                              From: {ticket.profile?.full_name || 'Unknown User'} ({ticket.profile?.email || 'No email'})
                             </p>
                             <p className="text-sm text-gray-500">
                               {format(new Date(ticket.created_at), 'MMM dd, HH:mm')}
@@ -473,7 +473,7 @@ const Admin = () => {
                               <div key={reply.id} className={`p-3 rounded-lg ${reply.is_admin ? 'bg-blue-50 ml-4' : 'bg-gray-100 mr-4'}`}>
                                 <div className="flex justify-between items-start mb-2">
                                   <span className="text-sm font-medium">
-                                    {reply.is_admin ? 'Admin' : (reply.profiles?.full_name || 'User')}
+                                    {reply.is_admin ? 'Admin' : (reply.profile?.full_name || 'User')}
                                   </span>
                                   <span className="text-xs text-gray-500">
                                     {format(new Date(reply.created_at), 'MMM dd, HH:mm')}

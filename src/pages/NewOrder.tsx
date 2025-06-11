@@ -5,63 +5,87 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShoppingCart, Clock, Star, Wallet, AlertCircle } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { ShoppingCart, Calculator, AlertCircle, Wallet, CreditCard, CheckCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useServices } from '@/hooks/useServices';
 import { useCreateOrder } from '@/hooks/useOrders';
-import { useProfile } from '@/hooks/useProfile';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useWallet } from '@/hooks/useWallet';
 
 const NewOrder = () => {
-  const [category, setCategory] = useState('');
-  const [service, setService] = useState('');
-  const [link, setLink] = useState('');
+  const [selectedService, setSelectedService] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [link, setLink] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [totalCost, setTotalCost] = useState(0);
+
   const { toast } = useToast();
-  const { user } = useAuth();
-
-  const { data: services = [] } = useServices();
+  const { data: services = [], isLoading: servicesLoading } = useServices();
+  const { data: wallet } = useWallet();
   const createOrder = useCreateOrder();
-  const { data: profile } = useProfile();
 
-  const categories = [...new Set(services.map(s => s.category))];
-  const filteredServices = services.filter(s => s.category === category);
-  const selectedService = filteredServices.find(s => s.id === service);
-  
-  const totalPrice = selectedService && quantity 
-    ? (selectedService.price_per_1000 * parseInt(quantity) / 1000).toFixed(2) 
-    : '0.00';
-
-  const userBalance = profile?.balance || 0;
-  const hasInsufficientFunds = parseFloat(totalPrice) > userBalance;
+  const activeServices = services.filter(service => service.is_active);
+  const selectedServiceData = activeServices.find(service => service.id === selectedService);
+  const balance = wallet?.balance || 0;
 
   useEffect(() => {
-    if (category && !filteredServices.find(s => s.id === service)) {
-      setService('');
+    if (selectedServiceData && quantity) {
+      const qty = parseInt(quantity) || 0;
+      const cost = (qty / 1000) * selectedServiceData.price_per_1000;
+      setTotalCost(Math.round(cost * 100) / 100);
+    } else {
+      setTotalCost(0);
     }
-  }, [category, filteredServices, service]);
+  }, [selectedService, quantity, selectedServiceData]);
+
+  const validateUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedService) {
+    if (!selectedServiceData) {
       toast({
-        title: 'Error',
-        description: 'Please select a service',
+        title: 'Service Required',
+        description: 'Please select a service.',
         variant: 'destructive',
       });
       return;
     }
 
-    const orderAmount = parseFloat(totalPrice);
-
-    if (orderAmount > userBalance) {
+    const qty = parseInt(quantity);
+    
+    if (!qty || qty < selectedServiceData.min_quantity || qty > selectedServiceData.max_quantity) {
       toast({
-        title: 'Insufficient Wallet Balance',
-        description: `You need ₹${orderAmount.toFixed(2)} but only have ₹${userBalance.toFixed(2)}. Please add funds to your wallet.`,
+        title: 'Invalid Quantity',
+        description: `Quantity must be between ${selectedServiceData.min_quantity} and ${selectedServiceData.max_quantity}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!link || !validateUrl(link)) {
+      toast({
+        title: 'Invalid Link',
+        description: 'Please provide a valid URL.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (totalCost > balance) {
+      toast({
+        title: 'Insufficient Balance',
+        description: 'Please add funds to your wallet first.',
         variant: 'destructive',
       });
       return;
@@ -70,62 +94,31 @@ const NewOrder = () => {
     setIsLoading(true);
 
     try {
-      // Create order
-      const orderData = await createOrder.mutateAsync({
-        service_id: selectedService.id,
-        link,
-        quantity: parseInt(quantity),
-        total_cost: orderAmount,
+      await createOrder.mutateAsync({
+        service_id: selectedService,
+        quantity: qty,
+        link: link.trim(),
+        total_cost: totalCost,
       });
-
-      // Deduct from wallet balance
-      const newBalance = userBalance - orderAmount;
-      await supabase
-        .from('profiles')
-        .update({ balance: newBalance })
-        .eq('id', user?.id);
-
-      // Create transaction record
-      await supabase
-        .from('transactions')
-        .insert({
-          user_id: user?.id,
-          type: 'order',
-          amount: orderAmount,
-          description: `Order for ${selectedService.name}`,
-          status: 'completed'
-        });
-
-      // Send admin notification email
-      try {
-        await supabase.functions.invoke('send-order-notification', {
-          body: {
-            order: {
-              id: orderData.id,
-              user_email: user?.email,
-              service_name: selectedService.name,
-              quantity: parseInt(quantity),
-              amount: orderAmount,
-              link,
-            }
-          }
-        });
-      } catch (emailError) {
-        console.log('Email notification failed:', emailError);
-        // Don't block the order if email fails
-      }
 
       toast({
-        title: 'Order Placed Successfully!',
-        description: `Your order for ${selectedService.name} has been placed. ₹${orderAmount.toFixed(2)} deducted from wallet.`,
+        title: 'Order Placed Successfully! 🎉',
+        description: 'Your order has been submitted and will be processed shortly.',
       });
-      
+
       // Reset form
-      setCategory('');
-      setService('');
-      setLink('');
+      setSelectedService('');
       setQuantity('');
+      setLink('');
+      setTotalCost(0);
+      
+      // Redirect to orders page
+      setTimeout(() => {
+        window.location.href = '/orders';
+      }, 2000);
+      
     } catch (error: any) {
+      console.error('Error creating order:', error);
       toast({
         title: 'Order Failed',
         description: error.message || 'Failed to place order. Please try again.',
@@ -136,13 +129,24 @@ const NewOrder = () => {
     }
   };
 
+  const groupedServices = activeServices.reduce((acc, service) => {
+    if (!acc[service.category]) {
+      acc[service.category] = [];
+    }
+    acc[service.category].push(service);
+    return acc;
+  }, {} as Record<string, typeof activeServices>);
+
   return (
     <DashboardLayout>
-      <div className="space-y-8 p-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Place New Order</h1>
+      <div className="max-w-4xl mx-auto p-6 space-y-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center justify-center gap-2">
+            <ShoppingCart className="w-8 h-8 text-blue-600" />
+            Place New Order
+          </h1>
           <p className="text-gray-600">
-            Choose from our wide range of social media marketing services to boost your online presence.
+            Choose a service and boost your social media presence instantly.
           </p>
         </div>
 
@@ -151,102 +155,139 @@ const NewOrder = () => {
           <div className="lg:col-span-2">
             <Card className="light-card">
               <CardHeader>
-                <CardTitle className="text-gray-900">Order Details</CardTitle>
-                <CardDescription>Fill in the details below to place your order</CardDescription>
+                <CardTitle>Order Details</CardTitle>
+                <CardDescription>
+                  Fill in the details below to place your order
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Service Selection */}
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select value={category} onValueChange={setCategory}>
+                    <Label htmlFor="service">Select Service</Label>
+                    <Select value={selectedService} onValueChange={setSelectedService}>
                       <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder="Choose a service..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        {Object.entries(groupedServices).map(([category, categoryServices]) => (
+                          <div key={category}>
+                            <div className="px-2 py-1 text-sm font-semibold text-gray-500 bg-gray-100">
+                              {category}
+                            </div>
+                            {categoryServices.map((service) => (
+                              <SelectItem key={service.id} value={service.id}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{service.name}</span>
+                                  <span className="text-sm text-gray-500 ml-4">₹{service.price_per_1000}/1k</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </div>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {category && (
-                    <div className="space-y-2">
-                      <Label htmlFor="service">Service</Label>
-                      <Select value={service} onValueChange={setService}>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue placeholder="Select a service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredServices.map((serv) => (
-                            <SelectItem key={serv.id} value={serv.id}>
-                              {serv.name} - ₹{serv.price_per_1000}/1k
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {/* Service Details */}
+                  {selectedServiceData && (
+                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-medium text-blue-900">{selectedServiceData.name}</h3>
+                          <Badge variant="outline" className="rounded-full">
+                            {selectedServiceData.category}
+                          </Badge>
+                        </div>
+                        {selectedServiceData.description && (
+                          <p className="text-sm text-blue-700">{selectedServiceData.description}</p>
+                        )}
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <span className="text-blue-600 font-medium">Price:</span>
+                            <br />
+                            ₹{selectedServiceData.price_per_1000}/1k
+                          </div>
+                          <div>
+                            <span className="text-blue-600 font-medium">Min:</span>
+                            <br />
+                            {selectedServiceData.min_quantity.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="text-blue-600 font-medium">Max:</span>
+                            <br />
+                            {selectedServiceData.max_quantity.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
+                  {/* Quantity */}
                   <div className="space-y-2">
-                    <Label htmlFor="link">Link</Label>
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      placeholder={selectedServiceData ? `Min: ${selectedServiceData.min_quantity}` : "Enter quantity"}
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      min={selectedServiceData?.min_quantity || 1}
+                      max={selectedServiceData?.max_quantity || 1000000}
+                      className="rounded-xl"
+                      required
+                    />
+                  </div>
+
+                  {/* Link */}
+                  <div className="space-y-2">
+                    <Label htmlFor="link">Target Link</Label>
                     <Input
                       id="link"
                       type="url"
                       placeholder="https://instagram.com/your-profile"
                       value={link}
                       onChange={(e) => setLink(e.target.value)}
-                      required
                       className="rounded-xl"
+                      required
                     />
+                    <p className="text-xs text-gray-500">
+                      Provide the complete URL of your post/profile
+                    </p>
                   </div>
 
-                  {selectedService && (
-                    <div className="space-y-2">
-                      <Label htmlFor="quantity">
-                        Quantity (Min: {selectedService.min_quantity}, Max: {selectedService.max_quantity})
-                      </Label>
-                      <Input
-                        id="quantity"
-                        type="number"
-                        min={selectedService.min_quantity}
-                        max={selectedService.max_quantity}
-                        placeholder={`Enter quantity (${selectedService.min_quantity}-${selectedService.max_quantity})`}
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        required
-                        className="rounded-xl"
-                      />
-                    </div>
-                  )}
-
-                  {hasInsufficientFunds && parseFloat(totalPrice) > 0 && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-                      <div className="flex items-center">
-                        <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-                        <p className="text-red-800 text-sm">
-                          Insufficient wallet balance! You need ₹{totalPrice} but have ₹{userBalance.toFixed(2)}. 
-                          Please add funds to your wallet.
-                        </p>
-                      </div>
-                    </div>
+                  {/* Balance Warning */}
+                  {totalCost > balance && totalCost > 0 && (
+                    <Alert className="border-red-200 bg-red-50">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-700">
+                        Insufficient balance. You need ₹{(totalCost - balance).toFixed(2)} more to place this order.
+                        <Button 
+                          variant="link" 
+                          className="p-0 h-auto text-red-600 underline ml-1"
+                          onClick={() => window.location.href = '/wallet'}
+                        >
+                          Add funds
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
                   )}
 
                   <Button
                     type="submit"
-                    className="w-full gradient-primary hover:opacity-90 transition-all duration-200 rounded-xl py-3"
-                    disabled={!selectedService || !link || !quantity || isLoading || hasInsufficientFunds}
+                    className="w-full gradient-primary rounded-xl h-12 text-lg font-semibold"
+                    disabled={!selectedService || !quantity || !link || isLoading || totalCost > balance}
                   >
                     {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin" />
                         Placing Order...
                       </div>
                     ) : (
-                      <>
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        Place Order - ₹{totalPrice}
-                      </>
+                      <div className="flex items-center gap-2">
+                        <ShoppingCart className="w-5 h-5" />
+                        Place Order - ₹{totalCost.toFixed(2)}
+                      </div>
                     )}
                   </Button>
                 </form>
@@ -254,94 +295,91 @@ const NewOrder = () => {
             </Card>
           </div>
 
-          {/* Order Summary & Wallet Info */}
+          {/* Order Summary */}
           <div className="space-y-6">
-            {/* Wallet Balance */}
             <Card className="light-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900">
-                  <Wallet className="w-5 h-5 text-blue-600" />
+                <CardTitle className="flex items-center gap-2">
+                  <Calculator className="w-5 h-5" />
+                  Order Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Service:</span>
+                    <span className="font-medium">
+                      {selectedServiceData?.name || 'None selected'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Quantity:</span>
+                    <span className="font-medium">
+                      {quantity ? parseInt(quantity).toLocaleString() : '0'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Rate:</span>
+                    <span className="font-medium">
+                      ₹{selectedServiceData?.price_per_1000 || 0}/1k
+                    </span>
+                  </div>
+                  <hr className="border-gray-200" />
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total Cost:</span>
+                    <span className="text-blue-600">₹{totalCost.toFixed(2)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="light-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5" />
                   Wallet Balance
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-blue-600">₹{userBalance.toFixed(2)}</div>
-                <p className="text-sm text-gray-600 mt-1">Available for orders</p>
-              </CardContent>
-            </Card>
-
-            {/* Order Summary */}
-            <Card className="light-card">
-              <CardHeader>
-                <CardTitle className="text-gray-900">Order Summary</CardTitle>
-              </CardHeader>
               <CardContent className="space-y-4">
-                {selectedService ? (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Service:</span>
-                      <span className="font-medium text-gray-900">{selectedService.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Price per 1000:</span>
-                      <span className="font-medium text-gray-900">₹{selectedService.price_per_1000}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Quantity:</span>
-                      <span className="font-medium text-gray-900">{quantity || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Delivery time:</span>
-                      <span className="font-medium flex items-center gap-1 text-gray-900">
-                        <Clock className="w-4 h-4" />
-                        0-24 hours
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    ₹{balance.toFixed(2)}
+                  </div>
+                  <p className="text-sm text-gray-600">Available Balance</p>
+                </div>
+                
+                {totalCost > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>After Order:</span>
+                      <span className={totalCost > balance ? 'text-red-600 font-medium' : 'text-gray-600'}>
+                        ₹{Math.max(0, balance - totalCost).toFixed(2)}
                       </span>
                     </div>
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between text-lg font-bold">
-                        <span className="text-gray-900">Total:</span>
-                        <span className={hasInsufficientFunds ? 'text-red-500' : 'text-blue-600'}>
-                          ₹{totalPrice}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-gray-500 text-center py-8">
-                    Select a service to see the summary
-                  </p>
+                  </div>
                 )}
+
+                <Button 
+                  variant="outline" 
+                  className="w-full rounded-xl"
+                  onClick={() => window.location.href = '/wallet'}
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Add Funds
+                </Button>
               </CardContent>
             </Card>
 
-            {/* Why Choose Us */}
-            <Card className="light-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900">
-                  <Star className="w-5 h-5 text-yellow-500" />
-                  Why Choose Us?
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
-                  <div>
-                    <p className="font-medium text-gray-900">High Quality</p>
-                    <p className="text-sm text-gray-600">Real, active users with high retention rates</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
-                  <div>
-                    <p className="font-medium text-gray-900">Fast Delivery</p>
-                    <p className="text-sm text-gray-600">Most orders start within minutes</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
-                  <div>
-                    <p className="font-medium text-gray-900">24/7 Support</p>
-                    <p className="text-sm text-gray-600">Always here to help you succeed</p>
+            {/* Security Notice */}
+            <Card className="light-card border-green-200 bg-green-50">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-green-800">Secure & Guaranteed</h4>
+                    <p className="text-sm text-green-700">
+                      All orders are processed securely with high-quality delivery guarantee.
+                    </p>
                   </div>
                 </div>
               </CardContent>
