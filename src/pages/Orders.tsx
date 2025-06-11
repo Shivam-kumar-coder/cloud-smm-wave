@@ -1,147 +1,162 @@
-
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, ExternalLink, Calendar, CreditCard, Loader2, ShoppingCart } from 'lucide-react';
-import { useOrders } from '@/hooks/useOrders';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, Filter, Eye, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
+import { useOrders } from '@/hooks/useOrders';
 import OrderStatusTracker from '@/components/OrderStatusTracker';
-import { format } from 'date-fns';
 
 const Orders = () => {
   const { data: orders = [], isLoading } = useOrders();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  if (isLoading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        </div>
-      </DashboardLayout>
-    );
-  }
+  const filteredOrders = orders.filter(order => {
+    const searchRegex = new RegExp(searchTerm, 'i');
+    const matchesSearch = searchRegex.test(order.services?.name) || searchRegex.test(order.id);
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleViewOrder = (order: any) => {
+    setSelectedOrder(order);
+  };
+
+  const statusOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ];
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 p-6">
+      <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-              <Package className="w-8 h-8 text-blue-600" />
-              My Orders
-            </h1>
-            <p className="text-gray-600">
-              Track your SMM service orders and their delivery status.
+            <h1 className="text-3xl font-bold">Your Orders</h1>
+            <p className="text-muted-foreground mt-2">
+              Track and manage your SMM Kings orders.
             </p>
           </div>
-          <Button 
-            onClick={() => window.location.href = '/new-order'} 
-            className="gradient-primary rounded-xl"
-          >
-            <ShoppingCart className="w-4 h-4 mr-2" />
-            New Order
-          </Button>
         </div>
 
-        {orders.length === 0 ? (
-          <Card className="light-card text-center py-12">
-            <CardContent>
-              <Package className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Orders Yet</h3>
-              <p className="text-gray-600 mb-6">
-                You haven't placed any orders yet. Start by ordering your first SMM service!
-              </p>
-              <Button 
-                onClick={() => window.location.href = '/new-order'} 
-                className="gradient-primary rounded-xl"
-              >
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Place Your First Order
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6">
-            {orders.map((order) => (
-              <Card key={order.id} className="light-card hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-lg">
-                        {order.services?.name || 'Unknown Service'}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-4">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {format(new Date(order.created_at), 'MMM dd, yyyy HH:mm')}
+        <Card className="glass-card border-0">
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle>Order History</CardTitle>
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  type="search"
+                  placeholder="Search orders..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Loading orders...
+              </div>
+            ) : filteredOrders.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredOrders.map((order) => (
+                  <Card key={order.id} className="glass-card border-0 hover:scale-105 transition-transform duration-200">
+                    <CardHeader>
+                      <CardTitle>{order.services?.name}</CardTitle>
+                      <CardDescription>Order ID: {order.id}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <OrderStatusTracker status={order.status} />
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Quantity: {order.quantity.toLocaleString()}
                         </span>
-                        <span>Order #{order.id.slice(0, 8)}</span>
-                      </CardDescription>
-                    </div>
-                    <Badge variant="outline" className="rounded-full">
-                      {order.services?.category || 'Unknown'}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-6">
-                  <OrderStatusTracker status={order.status || 'pending'} />
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-xl">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {order.quantity?.toLocaleString() || 0}
+                        <span className="text-sm font-medium">
+                          ${Number(order.total_cost).toFixed(2)}
+                        </span>
                       </div>
-                      <div className="text-sm text-gray-600">Quantity</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600 flex items-center justify-center gap-1">
-                        <CreditCard className="w-5 h-5" />
-                        ₹{order.total_cost || 0}
-                      </div>
-                      <div className="text-sm text-gray-600">Total Cost</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {order.remains || 0}
-                      </div>
-                      <div className="text-sm text-gray-600">Remaining</div>
-                    </div>
-                  </div>
+                      <Button variant="outline" className="w-full" onClick={() => handleViewOrder(order)}>
+                        View Details
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No orders found.
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-                  {order.link && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700">Target Link:</Label>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 p-3 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 truncate">
-                          {order.link}
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(order.link, '_blank')}
-                          className="rounded-lg"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <div className="text-sm text-gray-500">
-                      Last updated: {format(new Date(order.updated_at), 'MMM dd, HH:mm')}
-                    </div>
-                    {order.status === 'processing' && (
-                      <div className="flex items-center gap-2 text-blue-600 text-sm">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Delivering...
-                      </div>
-                    )}
+        {/* Order Details Modal */}
+        {selectedOrder && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+            <Card className="w-full max-w-2xl glass-card border-0">
+              <CardHeader className="flex items-center justify-between">
+                <CardTitle>Order Details</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(null)}>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Close
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Service</Label>
+                    <p className="font-medium">{selectedOrder.services?.name}</p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <div>
+                    <Label>Order ID</Label>
+                    <p className="font-medium">{selectedOrder.id}</p>
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <OrderStatusTracker status={selectedOrder.status} />
+                  </div>
+                  <div>
+                    <Label>Quantity</Label>
+                    <p className="font-medium">{selectedOrder.quantity.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label>Total Cost</Label>
+                    <p className="font-medium">${Number(selectedOrder.total_cost).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <Label>Order Date</Label>
+                    <p className="font-medium">{new Date(selectedOrder.created_at).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <div>
+                  <Label>Link</Label>
+                  <p className="font-medium">{selectedOrder.link}</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
