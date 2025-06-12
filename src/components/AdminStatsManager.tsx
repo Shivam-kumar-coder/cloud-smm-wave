@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,11 +14,23 @@ const AdminStatsManager = () => {
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
-    happy_customers: settings?.happy_customers || 10000,
-    orders_completed: settings?.orders_completed || 50000,
-    total_services: settings?.total_services || 500,
-    success_rate: settings?.success_rate || 99.9
+    happy_customers: 10000,
+    orders_completed: 50000,
+    total_services: 500,
+    success_rate: 99.9
   });
+
+  // Update form data when settings are loaded
+  useEffect(() => {
+    if (settings) {
+      setFormData({
+        happy_customers: settings.happy_customers || 10000,
+        orders_completed: settings.orders_completed || 50000,
+        total_services: settings.total_services || 500,
+        success_rate: settings.success_rate || 99.9
+      });
+    }
+  }, [settings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

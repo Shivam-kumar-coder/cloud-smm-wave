@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import { useAdminOrders, useUpdateOrderStatus } from '@/hooks/useAdminOrders';
 import { useAdminTickets, useCreateAdminReply, useUpdateTicketStatus } from '@/hooks/useAdminTickets';
 import { useToast } from '@/hooks/use-toast';
 import AdminStatsManager from '@/components/AdminStatsManager';
+import AdminServicesManager from '@/components/AdminServicesManager';
 
 const Admin = () => {
   const { data: orders = [] } = useAdminOrders();
@@ -125,7 +127,7 @@ const Admin = () => {
           <div>
             <h1 className="text-3xl font-bold">Admin Dashboard</h1>
             <p className="text-muted-foreground mt-2">
-              Manage orders, tickets, and system settings.
+              Manage orders, tickets, services, and system settings.
             </p>
           </div>
         </div>
@@ -151,10 +153,11 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="orders">Orders Management</TabsTrigger>
-            <TabsTrigger value="tickets">Support Tickets</TabsTrigger>
-            <TabsTrigger value="settings">Frontend Settings</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="tickets">Tickets</TabsTrigger>
+            <TabsTrigger value="services">Services</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders" className="space-y-6">
@@ -315,6 +318,10 @@ const Admin = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="services" className="space-y-6">
+            <AdminServicesManager />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">

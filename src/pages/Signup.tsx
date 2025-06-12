@@ -40,7 +40,7 @@ export default function Signup() {
     } else {
       toast({
         title: "Account Created Successfully!",
-        description: "You can now login to your account.",
+        description: "Please check your email to verify your account before signing in.",
         duration: 10000,
       })
       navigate('/login')
