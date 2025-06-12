@@ -3,12 +3,14 @@
 
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { supabase } from "@/integrations/supabase/client"
+import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
+import { supabase } from "@/integrations/supabase/client"
 
 export default function Signup() {
   const navigate = useNavigate()
+  const { signUp } = useAuth()
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [email, setEmail] = useState("")
@@ -19,31 +21,26 @@ export default function Signup() {
     e.preventDefault()
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-        data: {
-          full_name: fullName,
-        },
-      },
-    })
-
-    if (error) {
+    try {
+      const { error } = await signUp(email, password, fullName)
+      
+      if (error) {
+        toast({
+          title: "Signup Failed",
+          description: error.message,
+          variant: "destructive",
+          duration: 10000,
+        })
+      } else {
+        navigate('/login')
+      }
+    } catch (error: any) {
       toast({
         title: "Signup Failed",
-        description: error.message,
+        description: error.message || "An unexpected error occurred",
         variant: "destructive",
         duration: 10000,
       })
-    } else {
-      toast({
-        title: "Account Created Successfully!",
-        description: "Please check your email to verify your account before signing in.",
-        duration: 10000,
-      })
-      navigate('/login')
     }
 
     setLoading(false)

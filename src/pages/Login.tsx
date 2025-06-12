@@ -3,12 +3,14 @@
 
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { supabase } from "@/integrations/supabase/client"
+import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
+import { supabase } from "@/integrations/supabase/client"
 
 export default function Login() {
   const navigate = useNavigate()
+  const { signIn } = useAuth()
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [email, setEmail] = useState("")
@@ -18,37 +20,27 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      toast({
-        title: "Login Failed",
-        description: error.message,
-        variant: "destructive",
-        duration: 10000,
-      })
-    } else if (data.user) {
-      // Check if user's email is confirmed
-      if (!data.user.email_confirmed_at) {
+    try {
+      const { error } = await signIn(email, password)
+      
+      if (error) {
         toast({
-          title: "Email Verification Required",
-          description: "Please check your email and verify your account before signing in.",
+          title: "Login Failed",
+          description: error.message,
           variant: "destructive",
           duration: 10000,
         })
-        // Sign out the user since they're not verified
-        await supabase.auth.signOut()
       } else {
-        toast({
-          title: "Welcome back!",
-          description: "You have been logged in successfully.",
-          duration: 5000,
-        })
+        // Navigation will be handled by auth state change
         navigate('/dashboard')
       }
+    } catch (error: any) {
+      toast({
+        title: "Login Failed",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive",
+        duration: 10000,
+      })
     }
 
     setLoading(false)

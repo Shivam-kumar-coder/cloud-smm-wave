@@ -9,12 +9,14 @@ export const useAdminSettings = () => {
   return useQuery({
     queryKey: ['adminSettings'],
     queryFn: async () => {
-      // Use a raw query since admin_settings is not in the generated types yet
-      const { data, error } = await supabase.rpc('get_admin_settings');
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('*')
+        .single();
 
       if (error) {
         console.error('Error fetching admin settings:', error);
-        // Return default values if RPC fails
+        // Return default values if query fails
         return {
           happy_customers: 10000,
           orders_completed: 50000,
@@ -44,12 +46,18 @@ export const useUpdateAdminSettings = () => {
       total_services: number;
       success_rate: number;
     }) => {
-      const { data, error } = await supabase.rpc('update_admin_settings', {
-        new_happy_customers: settings.happy_customers,
-        new_orders_completed: settings.orders_completed,
-        new_total_services: settings.total_services,
-        new_success_rate: settings.success_rate
-      });
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .update({
+          happy_customers: settings.happy_customers,
+          orders_completed: settings.orders_completed,
+          total_services: settings.total_services,
+          success_rate: settings.success_rate,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', (await supabase.from('admin_settings').select('id').single()).data?.id)
+        .select()
+        .single();
 
       if (error) throw error;
       return data;

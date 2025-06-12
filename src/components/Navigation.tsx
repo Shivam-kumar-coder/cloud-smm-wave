@@ -3,15 +3,12 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Menu, X, User, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface NavigationProps {
-  isAuthenticated?: boolean;
-  onLogout?: () => void;
-}
-
-const Navigation = ({ isAuthenticated = false, onLogout }: NavigationProps) => {
+const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   const navLinks = [
     { href: '/', label: 'Home' },
@@ -19,6 +16,10 @@ const Navigation = ({ isAuthenticated = false, onLogout }: NavigationProps) => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <nav className="bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50">
@@ -51,7 +52,7 @@ const Navigation = ({ isAuthenticated = false, onLogout }: NavigationProps) => {
               </Link>
             ))}
 
-            {isAuthenticated ? (
+            {user ? (
               <div className="flex items-center space-x-4">
                 <Link to="/dashboard">
                   <Button variant="default" size="sm">
@@ -62,7 +63,7 @@ const Navigation = ({ isAuthenticated = false, onLogout }: NavigationProps) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={onLogout}
+                  onClick={handleLogout}
                   className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
@@ -116,7 +117,7 @@ const Navigation = ({ isAuthenticated = false, onLogout }: NavigationProps) => {
             ))}
 
             <div className="pt-4 space-y-2">
-              {isAuthenticated ? (
+              {user ? (
                 <>
                   <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>
                     <Button variant="default" size="sm" className="w-full">
@@ -128,7 +129,7 @@ const Navigation = ({ isAuthenticated = false, onLogout }: NavigationProps) => {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      onLogout?.();
+                      handleLogout();
                       setIsMenuOpen(false);
                     }}
                     className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"

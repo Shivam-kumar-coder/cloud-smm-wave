@@ -29,14 +29,62 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session);
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session);
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Create profile for new users
+        // Handle user signup and profile creation
+        if (event === 'SIGNED_UP' && session?.user) {
+          console.log('User signed up, creating profile...');
+          
+          // Create profile for new users
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: session.user.id,
+              email: session.user.email,
+              full_name: session.user.user_metadata?.full_name || '',
+              role: 'user',
+              balance: 0
+            });
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+          } else {
+            console.log('Profile created successfully');
+          }
+        }
+
+        // Handle verified sign in
         if (event === 'SIGNED_IN' && session?.user) {
+          console.log('User signed in, checking verification...');
+          
+          // Check if user's email is verified
+          if (!session.user.email_confirmed_at) {
+            console.log('Email not verified, signing out...');
+            toast({
+              title: "Email Verification Required",
+              description: "Please verify your email before signing in. Check your inbox for the verification link.",
+              variant: "destructive",
+              duration: 10000,
+            });
+            await supabase.auth.signOut();
+            return;
+          }
+
+          // Check if profile exists
           const { data: existingProfile } = await supabase
             .from('profiles')
             .select('id')
@@ -44,6 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .single();
 
           if (!existingProfile) {
+            console.log('Creating profile for existing user...');
             const { error: profileError } = await supabase
               .from('profiles')
               .insert({
@@ -62,12 +111,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -76,7 +119,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
           full_name: fullName,
         },
@@ -85,8 +128,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (!error) {
       toast({
-        title: "Sign up successful",
-        description: "Check your email to verify your account.",
+        title: "Account Created Successfully!",
+        description: "Please check your email and verify your account before signing in.",
+        duration: 10000,
       });
     }
 
@@ -102,6 +146,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!error) {
       toast({
         title: "Login successful",
+        description: "Welcome back!",
       });
     }
 
@@ -110,6 +155,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    toast({
+      title: "Signed out",
+      description: "You have been signed out successfully.",
+    });
   };
 
   const value = {
